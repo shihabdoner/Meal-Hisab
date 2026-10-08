@@ -85,3 +85,11 @@ textarea:focus{outline:2px solid #09ff00;border-radius:4px}
 .mrow{display:grid;grid-template-columns:1fr;gap:6px;padding:8px;margin-bottom:8px;background:#4a944a3f;border:2px dashed #000;font-family:"Exo 2",sans-serif}
 .mname{font-weight:700;color:#05f072}
 textarea[readonly]{opacity:.75;cursor:not-allowed}
+
+/* Sheet view tables */
+.sheet{margin-top:10px}
+.sheetTbl{font-size:.78rem;table-layout:auto;min-width:520px}
+.sheetTbl th,.sheetTbl td{padding:4px 6px;white-space:nowrap}
+.sheetTbl td:first-child{text-align:left;color:greenyellow}
+.sheetTbl tr.today td{background:#016e30;color:#fff}
+.sheetTbl tr.total td{font-weight:700;border-top:3px solid #09ff00;color:#05f072}
