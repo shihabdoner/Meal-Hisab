@@ -1,30 +1,23 @@
-# খাদ্য তথ্য – Meal & Fund Tracker
+# খাদ্য তথ্য v3 — Google Sheet is the database
 
-Static web app (GitHub Pages) with realtime storage in Firebase Firestore.
-Everyone who opens the site sees deposits, spending and meal entries update live.
+Website (GitHub Pages) <-> Google Apps Script (bound to your sheet) <-> your Google Sheet.
+Firebase is used only for Google sign-in. Members/admin live in the sheet's "Members" tab.
 
-## 1. Create the database (free, ~5 min)
-1. Go to https://console.firebase.google.com → **Add project**.
-2. **Build → Firestore Database → Create database** (start in production mode, pick a nearby region).
-3. **Rules** tab → paste the contents of `firestore.rules` → **Publish**.
-4. **Project settings (⚙) → Your apps → Web (`</>`)** → register an app → copy the `firebaseConfig` values.
-5. Paste them into `firebase-config.js`.
+## Setup
+1. Upload your original Excel file (or the CSV) to Google Drive, open it with Google Sheets
+   (CSV has no colours/merged cells and lost the Bengali letters (they show as ????) - re-type them in the sheet or upload the .xlsx).
+2. In the sheet: Extensions -> Apps Script. Delete the sample code, paste `apps-script-code.txt`, Save.
+3. Choose the function `setup` in the toolbar -> Run. Approve the permissions
+   (Advanced -> "Go to ... (unsafe)" -> Allow). This adds Members + MealDetails tabs and SUM formulas to the total rows.
+4. Open the new **Members** tab. In row 2 type: Shihab's Gmail (lowercase) | Shihab | TRUE
+5. Deploy -> New deployment -> type: Web app -> Execute as: **Me** -> Who has access: **Anyone** -> Deploy. Copy the URL (ends with /exec).
+6. Put the URL in `firebase-config.js` (SCRIPT_URL). Upload `index.html`, `app.js`, `style.css`, `firebase-config.js` to GitHub.
+7. Open the site, sign in as Shihab, use **Group admin** to add everyone's Gmail.
 
-## 2. Put it on GitHub Pages
-1. Create a GitHub repo and upload all files in this folder (keep them at the repo root).
-2. Repo → **Settings → Pages** → Source: *Deploy from a branch* → `main` / `/ (root)` → Save.
-3. Open `https://<your-username>.github.io/<repo-name>/`.
-4. In Firebase: **Authentication → Settings → Authorized domains** → add `<your-username>.github.io` (only needed if you later add sign-in).
+If you change the script later: Deploy -> Manage deployments -> edit -> New version.
 
-## Data layout
-- `deposits/{id}`: person, amount, date
-- `spending/{id}`: amount, date, details
-- `meals/{Person_YYYY-MM-DD}`: lunch, dinner
-
-## Security note
-The sample rules let anyone with the link read and write. The Firebase config is public by design,
-so for anything beyond a trusted group, add Firebase Authentication and change the rule to
-`allow read, write: if request.auth != null;`.
-
-## Run locally
-`python3 -m http.server` in this folder, then open http://localhost:8000
+## Notes
+- Each person's meal cell = lunch + dinner count (a filled box counts 1, or the number typed). Text is kept in the MealDetails tab.
+- Deposit/spending cells hold one amount per date; adding on the same date adds to the cell.
+- The sheet covers the dates in column F (Oct 1-30). For a new month, copy the tab with new dates.
+- Firestore is no longer used: set its rules to deny all (`allow read, write: if false;`).
