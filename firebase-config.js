@@ -1,9 +1,8 @@
-// Paste your Firebase web-app config here (Firebase Console → Project settings → Your apps → Web app).
 export const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyAfp6ACmE3d-9iAieAp1knA40qKEbdcx7Y",
+  authDomain: "khaddo-tothyo.firebaseapp.com",
+  projectId: "khaddo-tothyo",
+  storageBucket: "khaddo-tothyo.firebasestorage.app",
+  messagingSenderId: "221896509109",
+  appId: "1:221896509109:web:a36edd0b6f0ab4a8c020fc"
 };
