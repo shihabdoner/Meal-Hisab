@@ -75,3 +75,13 @@ textarea:focus{outline:2px solid #09ff00;border-radius:4px}
 .muted{color:#9a9a9a}
 [hidden]{display:none!important}
 #pt{color:greenyellow}
+
+/* Sign-in, top bar, admin panel */
+#login{text-align:center;margin-top:20px}
+#login p{margin:10px 0 14px}
+#login button{margin:4px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;font-family:"Exo 2",sans-serif;color:greenyellow}
+.topbar button{padding:6px 12px;font-size:.85rem}
+.mrow{display:grid;grid-template-columns:1fr;gap:6px;padding:8px;margin-bottom:8px;background:#4a944a3f;border:2px dashed #000;font-family:"Exo 2",sans-serif}
+.mname{font-weight:700;color:#05f072}
+textarea[readonly]{opacity:.75;cursor:not-allowed}
