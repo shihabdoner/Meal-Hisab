@@ -17,7 +17,7 @@
 <main>
   <h1 class="Fronttext">খাদ্য তথ্য</h1>
   <div class="date">Date: <b id="today"></b> <span id="live" class="live off">● offline</span></div>
-  <div id="setup" class="notice" hidden>Firebase is not configured yet. Open <code>firebase-config.js</code> and paste your config (see README).</div>
+  <div id="setup" class="notice" hidden>Not connected to the sheet yet. Open <code>firebase-config.js</code> and paste the Apps Script web app URL (see README).</div>
 
   <!-- Sign-in -->
   <section id="login" class="card" hidden>
@@ -29,7 +29,7 @@
 
   <!-- App (signed-in members only) -->
   <div id="app" hidden>
-    <div class="topbar"><span id="me"></span><button id="out">Sign out</button></div>
+    <div class="topbar"><span id="me"></span><span><button id="refresh" title="Reload from sheet">⟳</button> <button id="out">Sign out</button></span></div>
 
     <div class="grid">
       <div class="card wide"><div class="k">Last grocery spending</div><div class="v" id="last">N/A</div><div class="muted" id="lastd"></div></div>
@@ -82,6 +82,11 @@
       </div>
       <div class="status" id="status"></div>
     </section>
+
+    <h2 class="flick">Sheet view</h2>
+    <details class="card sheet"><summary>Meals (per day)</summary><div id="tblMeals" class="tablewrap"></div></details>
+    <details class="card sheet"><summary>Grocery spending</summary><div id="tblSpending" class="tablewrap"></div></details>
+    <details class="card sheet"><summary>Deposits</summary><div id="tblDeposits" class="tablewrap"></div></details>
 
     <h2 class="flick adminOnly" hidden>Group admin</h2>
     <section class="card adminOnly" id="adminPanel" hidden>
