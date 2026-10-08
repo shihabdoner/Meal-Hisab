@@ -19,54 +19,76 @@
   <div class="date">Date: <b id="today"></b> <span id="live" class="live off">● offline</span></div>
   <div id="setup" class="notice" hidden>Firebase is not configured yet. Open <code>firebase-config.js</code> and paste your config (see README).</div>
 
-  <div class="grid">
-    <div class="card wide"><div class="k">Last grocery spending</div><div class="v" id="last">N/A</div><div class="muted" id="lastd"></div></div>
-    <div class="card"><div class="k">Total fund</div><div class="v" id="fund">৳0</div></div>
-    <div class="card"><div class="k">Total spending</div><div class="v" id="spent">৳0</div></div>
-    <div class="card wide left" id="leftcard"><div class="k">Money left in the fund until today</div><div class="v" id="left">৳0</div></div>
-  </div>
-
-  <details class="card" style="margin-top:10px">
-    <summary>+ Add grocery spending</summary>
-    <form id="spForm" class="form">
-      <input id="spAmt" type="number" min="0" step="any" placeholder="Amount" required>
-      <input id="spDate" type="date" required>
-      <input id="spDet" type="text" placeholder="Details (what was bought)">
-      <button>Add</button>
-    </form>
-    <div id="spList"></div>
-  </details>
-
-  <h2 class="flick">Individual details</h2>
-  <select id="who">
-    <option value="">— নাম নির্বাচন করুন —</option>
-    <option>Shohan</option><option>Naved</option><option>Salman</option>
-    <option>Rifat</option><option>Shihab</option><option>Ashmit</option>
-  </select>
-
-  <section class="card" id="person" hidden>
-    <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
-    <div style="margin-top:10px"><b>জমাদানের তথ্য</b></div>
-    <div id="deps" class="muted"></div>
-    <form id="depForm" class="form">
-      <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" required>
-      <input id="depDate" type="date" required>
-      <button>+ Add deposit</button>
-    </form>
-
-    <h2 class="flick">Meal details</h2>
-    <input id="mealDate" type="date" class="mdate">
-    <div class="tablewrap">
-      <table>
-        <tr><th>দুপুর</th><th>রাত</th></tr>
-        <tr>
-          <td><textarea id="lunch" aria-label="দুপুর"></textarea></td>
-          <td><textarea id="dinner" aria-label="রাত"></textarea></td>
-        </tr>
-      </table>
-    </div>
-    <div class="status" id="status"></div>
+  <!-- Sign-in -->
+  <section id="login" class="card" hidden>
+    <div class="k">Private group</div>
+    <p id="loginMsg" class="muted">Sign in with the Google account the admin added for you.</p>
+    <button id="gBtn">Sign in with Google</button>
+    <button id="deniedOut" hidden>Sign out</button>
   </section>
+
+  <!-- App (signed-in members only) -->
+  <div id="app" hidden>
+    <div class="topbar"><span id="me"></span><button id="out">Sign out</button></div>
+
+    <div class="grid">
+      <div class="card wide"><div class="k">Last grocery spending</div><div class="v" id="last">N/A</div><div class="muted" id="lastd"></div></div>
+      <div class="card"><div class="k">Total fund</div><div class="v" id="fund">৳0</div></div>
+      <div class="card"><div class="k">Total spending</div><div class="v" id="spent">৳0</div></div>
+      <div class="card wide left" id="leftcard"><div class="k">Money left in the fund until today</div><div class="v" id="left">৳0</div></div>
+    </div>
+
+    <details class="card adminOnly" style="margin-top:10px" hidden>
+      <summary>+ Add grocery spending (admin)</summary>
+      <form id="spForm" class="form">
+        <input id="spAmt" type="number" min="0" step="any" placeholder="Amount" required>
+        <input id="spDate" type="date" required>
+        <input id="spDet" type="text" placeholder="Details (what was bought)">
+        <button>Add</button>
+      </form>
+    </details>
+    <details class="card" style="margin-top:10px">
+      <summary>Grocery spending history</summary>
+      <div id="spList"></div>
+    </details>
+
+    <h2 class="flick">Individual details</h2>
+    <select id="who">
+      <option value="">— নাম নির্বাচন করুন —</option>
+      <option>Shohan</option><option>Naved</option><option>Salman</option>
+      <option>Rifat</option><option>Shihab</option><option>Ashmit</option>
+    </select>
+
+    <section class="card" id="person" hidden>
+      <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
+      <div style="margin-top:10px"><b>জমাদানের তথ্য</b></div>
+      <div id="deps" class="muted"></div>
+      <form id="depForm" class="form adminOnly" hidden>
+        <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" required>
+        <input id="depDate" type="date" required>
+        <button>+ Add deposit (admin)</button>
+      </form>
+
+      <h2 class="flick">Meal details</h2>
+      <input id="mealDate" type="date" class="mdate">
+      <div class="tablewrap">
+        <table>
+          <tr><th>দুপুর</th><th>রাত</th></tr>
+          <tr>
+            <td><textarea id="lunch" aria-label="দুপুর"></textarea></td>
+            <td><textarea id="dinner" aria-label="রাত"></textarea></td>
+          </tr>
+        </table>
+      </div>
+      <div class="status" id="status"></div>
+    </section>
+
+    <h2 class="flick adminOnly" hidden>Group admin</h2>
+    <section class="card adminOnly" id="adminPanel" hidden>
+      <div class="muted" style="margin-bottom:8px">Add each person's Google email. "Make admin" hands over admin to that person and you become a regular member.</div>
+      <div id="memberList"></div>
+    </section>
+  </div>
 </main>
 <script type="module" src="app.js"></script>
 </body>
