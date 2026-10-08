@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Open read/write: anyone with the site link can edit. Fine for a small private group;
+    // see README for how to lock it down.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

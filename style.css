@@ -1,0 +1,34 @@
+:root{--bg:#f6f4ef;--card:#fff;--ink:#1d2433;--mute:#667085;--line:#e4e0d6;--accent:#2f7d5b;--accent-ink:#fff;--warn:#b54708;
+padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1d2229;--ink:#eceff4;--mute:#9aa4b2;--line:#2b323c;--accent:#4fb88a;--accent-ink:#0b1a13;--warn:#f79009}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans Bengali",sans-serif;line-height:1.5}
+main{max-width:720px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.4rem;margin:0 0 4px}
+h2{font-size:1.05rem;margin:22px 0 10px}
+.date{color:var(--mute);margin-bottom:14px}
+.live{font-size:.8rem;margin-left:8px}.live.on{color:var(--accent)}.live.off{color:var(--warn)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.card .k{font-size:.78rem;color:var(--mute)}
+.card .v{font-size:1.35rem;font-weight:650;margin-top:2px}
+.wide{grid-column:1/-1}
+.left .v{color:var(--accent)}.left.neg .v{color:var(--warn)}
+.notice{background:var(--card);border:1px solid var(--warn);color:var(--warn);padding:12px;border-radius:12px;margin-bottom:12px}
+select,input{width:100%;padding:11px;font-size:1rem;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-family:inherit}
+summary{cursor:pointer;font-weight:600}
+.form{display:grid;gap:8px;margin-top:10px}
+button{padding:11px 16px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-size:.95rem;font-weight:600;cursor:pointer}
+button.x{background:none;color:var(--mute);padding:0 6px;font-size:1.1rem}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.row:last-child{border:0}
+.mdate{margin-bottom:10px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th,td{border:1px solid var(--line);padding:8px;text-align:center}
+th{background:var(--bg)}
+textarea{width:100%;min-height:90px;resize:vertical;border:0;background:transparent;color:var(--ink);font:inherit;padding:4px}
+textarea:focus{outline:2px solid var(--accent);border-radius:6px}
+.status{color:var(--mute);font-size:.85rem;margin-top:6px;min-height:1.2em}
+.muted{color:var(--mute)}
+[hidden]{display:none!important}

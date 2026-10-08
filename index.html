@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f7d5b">
+<title>খাদ্য তথ্য</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>খাদ্য তথ্য</h1>
+  <div class="date">Date: <b id="today"></b> <span id="live" class="live off">● offline</span></div>
+  <div id="setup" class="notice" hidden>Firebase is not configured yet. Open <code>firebase-config.js</code> and paste your config (see README).</div>
+
+  <div class="grid">
+    <div class="card wide"><div class="k">Last grocery spending</div><div class="v" id="last">N/A</div><div class="muted" id="lastd"></div></div>
+    <div class="card"><div class="k">Total fund</div><div class="v" id="fund">৳0</div></div>
+    <div class="card"><div class="k">Total spending</div><div class="v" id="spent">৳0</div></div>
+    <div class="card wide left" id="leftcard"><div class="k">Money left in the fund until today</div><div class="v" id="left">৳0</div></div>
+  </div>
+
+  <details class="card" style="margin-top:10px">
+    <summary>+ Add grocery spending</summary>
+    <form id="spForm" class="form">
+      <input id="spAmt" type="number" min="0" step="any" placeholder="Amount" required>
+      <input id="spDate" type="date" required>
+      <input id="spDet" type="text" placeholder="Details (what was bought)">
+      <button>Add</button>
+    </form>
+    <div id="spList"></div>
+  </details>
+
+  <h2>Individual details</h2>
+  <select id="who">
+    <option value="">— নাম নির্বাচন করুন —</option>
+    <option>Shohan</option><option>Naved</option><option>Salman</option>
+    <option>Rifat</option><option>Shihab</option><option>Ashmit</option>
+  </select>
+
+  <section class="card" id="person" hidden>
+    <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
+    <div style="margin-top:10px"><b>জমাদানের তথ্য</b></div>
+    <div id="deps" class="muted"></div>
+    <form id="depForm" class="form">
+      <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" required>
+      <input id="depDate" type="date" required>
+      <button>+ Add deposit</button>
+    </form>
+
+    <h2>Meal details</h2>
+    <input id="mealDate" type="date" class="mdate">
+    <div class="tablewrap">
+      <table>
+        <tr><th>দুপুর</th><th>রাত</th></tr>
+        <tr>
+          <td><textarea id="lunch" aria-label="দুপুর"></textarea></td>
+          <td><textarea id="dinner" aria-label="রাত"></textarea></td>
+        </tr>
+      </table>
+    </div>
+    <div class="status" id="status"></div>
+  </section>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
