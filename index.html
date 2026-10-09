@@ -29,12 +29,12 @@
 
   <!-- App (signed-in members only) -->
   <div id="app" hidden>
-    <div class="topbar"><span id="me"></span><span><button id="refresh" title="Reload from sheet">⟳</button> <button id="out">Sign out</button></span></div>
+    <div class="topbar"><div><span id="me"></span><div class="month" id="monthLabel"></div></div><span><button id="refresh" title="Reload from sheet">⟳</button> <button id="out">Sign out</button></span></div>
 
     <div class="grid mine">
       <div class="card"><div class="k">My deposit to fund</div><div class="v" id="myDep">৳0</div></div>
       <div class="card" id="resCard"><div class="k">My residual</div><div class="v" id="myRes">৳0</div><div class="muted small" id="resNote"></div></div>
-      <div class="card"><div class="k">My advance</div><div class="v" id="myAdv">৳0</div></div>
+      <div class="card" id="dueCard"><div class="k">My Due</div><div class="v" id="myDue">৳0</div></div>
       <div class="card"><div class="k">সর্বশেষ বাজারের তারিখ</div><div class="v" id="lastDate">N/A</div></div>
     </div>
 
@@ -44,6 +44,16 @@
       <div class="card"><div class="k">Total spending</div><div class="v" id="spent">৳0</div></div>
       <div class="card wide left" id="leftcard"><div class="k">Money left in the fund until today</div><div class="v" id="left">৳0</div></div>
     </div>
+
+    <details class="card" style="margin-top:10px">
+      <summary>Print / Save as PDF</summary>
+      <div class="printBtns">
+        <button data-p="my">My data</button>
+        <button data-p="fund">Fund data</button>
+        <button data-p="bazar">Bazar data</button>
+        <button data-p="all">All</button>
+      </div>
+    </details>
 
     <details class="card adminOnly" style="margin-top:10px" hidden>
       <summary>+ Add grocery spending (admin)</summary>
@@ -102,6 +112,7 @@
     </section>
   </div>
 </main>
+<div id="report"></div>
 <script type="module" src="app.js"></script>
 </body>
 </html>
