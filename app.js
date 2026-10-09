@@ -76,7 +76,7 @@ async function refresh(force) {
 }
 
 function applyRole() {
-  $("me").textContent = `${me.name} · ${me.admin ? "👑 Admin" : "Member"}`;
+  $("me").textContent = `${me.name} · ${me.admin ? "Admin" : "Member"}`;
   document.querySelectorAll(".adminOnly").forEach(el => el.hidden = !me.admin);
   if (!$("who").value && NAMES.includes(me.name)) { $("who").value = me.name; }
   if (me.admin && !$("memberList").contains(document.activeElement)) renderMembers();
@@ -155,7 +155,7 @@ function renderMembers() {
     const u = (S.members || []).find(x => x.name === name);
     const row = document.createElement("div"); row.className = "mrow";
     const label = document.createElement("div"); label.className = "mname";
-    label.textContent = name + (u && u.admin ? " 👑" : "");
+    label.textContent = name + (u && u.admin ? "· Admin" : "· Member");
     const input = document.createElement("input"); input.type = "email"; input.placeholder = "Google email";
     input.value = u ? u.email : "";
     const save = document.createElement("button"); save.textContent = "Save";
