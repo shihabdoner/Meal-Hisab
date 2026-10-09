@@ -1,4 +1,3 @@
-
 /* Aesthetic borrowed from Watched.Shihab: black + neon green, dashed borders, flicker headings */
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box}
@@ -10,7 +9,7 @@ main{max-width:720px;margin:0 auto;padding:16px 14px 48px}
 .date{color:#9a9a9a;margin-bottom:14px;text-align:center;font-family:"Exo 2",sans-serif}
 .date b{color:greenyellow}
 
-/* Live status */
+/* Live dot (same fade as the "ongoing" marker) */
 .live{font-size:.8rem;margin-left:8px}
 .live.on{color:limegreen;text-shadow:0 0 6px limegreen,0 0 12px limegreen;animation:fade 1.5s infinite}
 .live.off{color:#ff0000}
@@ -33,7 +32,7 @@ main{max-width:720px;margin:0 auto;padding:16px 14px 48px}
 .left.neg{border-color:#ff0000;background:#1b0202}
 .left.neg .v{color:#ff0000}
 
-/* Section headings */
+/* Section headings: flickering neon like the "Colors" tag */
 h2.flick{text-align:center;background:#41414198;color:#7b7b7b;font-family:"Merienda",cursive;font-style:italic;font-size:1.05rem;
   animation:flicker 2s infinite;text-shadow:0 0 2px #ff00bf,0 0 10px #00ff1e;border-radius:30px;border:2px dashed green;
   padding:6px 10px;margin:24px 0 12px}
@@ -51,13 +50,13 @@ summary{cursor:pointer;font-weight:600;color:greenyellow;font-family:"Exo 2",san
 details.card[open] summary{margin-bottom:4px}
 .form{display:grid;gap:8px;margin-top:10px}
 
-/* Buttons */
+/* Buttons (whitesmoke -> green when pressed) */
 button{background:whitesmoke;color:#000;border:1px solid #000;border-radius:10%;padding:10px 16px;font-family:'Cascadia Code',Courier,monospace;font-size:.95rem;cursor:pointer;transition:all .3s ease}
 button:hover,button:active{background:#016e30;color:#fff;border:1px solid #09ff00;box-shadow:0 0 12px #09ff00}
 button.x{background:none;color:#9a9a9a;border:0;padding:0 6px;font-size:1.1rem;box-shadow:none}
 button.x:hover{color:#ff0000;background:none;border:0;box-shadow:none}
 
-/* Entry rows */
+/* Entry rows: dashed like the list items */
 .row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 8px;margin-bottom:5px;background:#4a944a3f;border:2px dashed #000;font-family:"Exo 2",sans-serif}
 .row b{color:#05f072}
 .row:last-child{margin-bottom:0}
@@ -109,7 +108,7 @@ textarea[readonly]{opacity:.75;cursor:not-allowed}
 .month{font-size:.85rem;color:#9a9a9a;font-family:"Exo 2",sans-serif}
 .printBtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 
-/* Printable report */
+/* Printable report (hidden on screen, shown when printing / saving as PDF) */
 #report{display:none}
 #report{font-family:"Exo 2",system-ui,sans-serif;color:#000;background:#fff}
 #report .rp-h1{font-size:20pt;font-weight:700;margin:0 0 2px}
@@ -142,38 +141,3 @@ textarea[readonly]{opacity:.75;cursor:not-allowed}
 .permChips{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:6px}
 .chip{display:inline-flex;align-items:center;gap:4px;font-size:.9rem;color:#fff;margin-bottom:6px}
 .chip input{width:auto;padding:0;margin:0}
-
-/* Requested interface updates */
-.topbar{flex-wrap:wrap}
-.topIdentity{min-width:130px}
-.adminPreview{width:auto;max-width:180px;margin:0;flex:1;min-width:125px}
-.lastDateCard{grid-column:1/-1}
-.detailSection{margin-bottom:12px}
-.detailSection label,.permissionBox>label{display:block;color:#9a9a9a;font-size:.85rem;margin:5px 0}
-.historyList{display:grid;gap:5px;margin:10px 0}
-.mealHistoryRow{align-items:flex-start;flex-wrap:wrap}
-.mealHistoryRow span:last-child{white-space:pre-line;text-align:left;flex:1}
-.spendingRow{align-items:flex-start}
-.spendingDescription{white-space:pre-line;overflow-wrap:anywhere;flex:1}
-.sp-date{display:inline-block;color:#000;background:greenyellow;border:1px solid #09ff00;border-radius:4px;padding:1px 5px;margin-right:3px;text-shadow:none}
-.editBtn{margin-left:6px;padding:4px 7px;font-size:.78rem;border-radius:4px}
-.permissionBox{margin-top:16px;padding:12px;border:2px dashed #2b6b2b;border-radius:6px}
-.permissionBox h3{margin:0 0 10px;color:greenyellow}
-.permGroup{margin:10px 0;padding:10px;background:#111;border:1px solid #2b6b2b;border-radius:5px}
-.permGroup>b{display:block;margin-bottom:8px;color:#05f072}
-.permGroup .chip{display:flex;width:100%;margin:8px 0}
-.permGroup .chip input{flex:0 0 auto}
-.permChips{display:flex;flex-wrap:wrap;gap:6px 14px}
-.permChips .chip{display:inline-flex;width:auto}
-.mrow{grid-template-columns:1fr}
-.notice{font-family:"Exo 2",sans-serif}
-.lastDateCard .v{font-size:1.1rem}
-
-@media(max-width:440px){
-  .topbar{align-items:flex-start}
-  .adminPreview{order:3;flex-basis:100%;max-width:none}
-  .spendingRow{gap:6px}
-  .spendingRow .editBtn{display:block;margin:5px 0 0 auto}
-  .row{padding:5px}
-  .detailSection{padding:10px}
-}
