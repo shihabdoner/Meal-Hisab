@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="bn">
 <head>
@@ -29,7 +30,8 @@
 
   <!-- App (signed-in members only) -->
   <div id="app" hidden>
-    <div class="topbar"><div><span id="me"></span><div class="month" id="monthLabel"></div></div><span><button id="refresh" title="Reload from sheet">⟳</button> <button id="out">Sign out</button></span></div>
+    <div class="topbar"><div class="topIdentity"><span id="me"></span><div class="month" id="monthLabel"></div></div><select id="adminPreview" class="adminPreview" aria-label="Preview member interface" hidden><option value="">Your admin view</option></select><span><button id="refresh" title="Reload from sheet">⟳</button> <button id="out">Sign out</button></span></div>
+    <div id="previewNotice" class="notice" hidden>Preview mode: showing the selected member’s interface. Editing is disabled in preview mode.</div>
 
     <div id="alertBar" class="alertBar" hidden></div>
 
@@ -37,11 +39,12 @@
       <div class="card"><div class="k">My deposit to fund</div><div class="v" id="myDep">৳0</div></div>
       <div class="card" id="resCard"><div class="k">My residual</div><div class="v" id="myRes">৳0</div><div class="muted small" id="resNote"></div></div>
       <div class="card" id="dueCard"><div class="k">My Due</div><div class="v" id="myDue">৳0</div></div>
-      <div class="card"><div class="k">সর্বশেষ বাজারের তারিখ</div><div class="v" id="lastDate">N/A</div></div>
+      <div class="card"><div class="k">Most recent added fund</div><div class="v" id="lastFund">N/A</div><div class="muted small" id="lastFundMeta"></div></div>
     </div>
 
     <div class="grid" style="margin-top:10px">
       <div class="card wide"><div class="k">Last grocery spending</div><div class="v" id="last">N/A</div><div class="muted" id="lastd"></div></div>
+      <div class="card wide lastDateCard"><div class="k">সর্বশেষ বাজারের তারিখ</div><div class="v" id="lastDate">N/A</div></div>
       <div class="card"><div class="k">Total fund</div><div class="v" id="fund">৳0</div></div>
       <div class="card"><div class="k">Total spending</div><div class="v" id="spent">৳0</div></div>
       <div class="card wide left" id="leftcard"><div class="k">Money left in the fund until today</div><div class="v" id="left">৳0</div></div>
@@ -63,6 +66,7 @@
         <input id="spAmt" type="number" min="0" step="any" placeholder="Amount" required>
         <input id="spDate" type="date" required>
         <textarea id="spDet" rows="3" placeholder="Details (what was bought) — Enter for a new line"></textarea>
+        <label for="spBazarKorta">বাজারকর্তা</label><select id="spBazarKorta" required><option value="">— বাজারকর্তা নির্বাচন করুন —</option></select>
         <button>Add</button>
       </form>
     </details>
@@ -72,36 +76,33 @@
       <div id="spList"></div>
     </details>
 
-    <h2 class="flick">Individual details</h2>
-    <select id="who">
-      <option value="">— নাম নির্বাচন করুন —</option>
-      <option>Shohan</option><option>Naved</option><option>Salman</option>
-      <option>Rifat</option><option>Shihab</option><option>Ashmit</option>
-    </select>
-
-    <section class="card" id="person" hidden>
-      <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
-      <div style="margin-top:10px"><b>জমাদানের তথ্য</b></div>
-      <div id="deps" class="muted"></div>
-      <form id="depForm" class="form" hidden>
-        <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" required>
-        <input id="depDate" type="date" required>
-        <button>+ Add deposit</button>
-      </form>
-
-      <h2 class="flick">Meal details</h2>
-      <input id="mealDate" type="date" class="mdate">
-      <div class="tablewrap">
-        <table>
-          <tr><th>দুপুর</th><th>রাত</th></tr>
-          <tr>
-            <td><textarea id="lunch" aria-label="দুপুর"></textarea></td>
-            <td><textarea id="dinner" aria-label="রাত"></textarea></td>
-          </tr>
-        </table>
+    <h2 class="flick">Fund details</h2>
+    <section class="card detailSection" id="fundSection">
+      <label for="fundWho">Select person</label><select id="fundWho"><option value="">— নাম নির্বাচন করুন —</option></select>
+      <div id="fundPerson" hidden>
+        <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
+        <div style="margin-top:10px"><b>জমাদানের তথ্য</b></div>
+        <div id="deps" class="muted"></div>
+        <form id="depForm" class="form" hidden>
+          <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" required>
+          <input id="depDate" type="date" required>
+          <button>+ Add deposit</button>
+        </form>
       </div>
-      <button id="mealSave" style="margin-top:8px" hidden>Save (add only)</button>
-      <div class="status" id="status"></div>
+    </section>
+
+    <h2 class="flick">Meal details</h2>
+    <section class="card detailSection" id="mealSection">
+      <label for="mealWho">Select person</label><select id="mealWho"><option value="">— নাম নির্বাচন করুন —</option></select>
+      <div id="mealPerson" hidden>
+        <div id="mealHistory" class="historyList"></div>
+        <div class="mealEditor">
+          <label for="mealDate">Entry date</label><input id="mealDate" type="date" class="mdate">
+          <div class="tablewrap"><table><tr><th>দুপুর</th><th>রাত</th></tr><tr><td><textarea id="lunch" aria-label="দুপুর"></textarea></td><td><textarea id="dinner" aria-label="রাত"></textarea></td></tr></table></div>
+          <button id="mealSave" style="margin-top:8px" hidden>Save (add only)</button>
+          <div class="status" id="status"></div>
+        </div>
+      </div>
     </section>
 
     <h2 class="flick">Sheet view</h2>
@@ -111,8 +112,21 @@
 
     <h2 class="flick adminOnly" hidden>Group admin</h2>
     <section class="card adminOnly" id="adminPanel" hidden>
-      <div class="muted" style="margin-bottom:8px">Add each person's Google email. "Make admin" hands over admin to that person and you become a regular member.</div>
+      <div class="muted" style="margin-bottom:8px">Add each person's Google email. “Make admin” hands over admin to that person and you become a regular member.</div>
       <div id="memberList"></div>
+      <div class="permissionBox">
+        <h3>Member permissions</h3>
+        <label for="permPerson">Persons</label><select id="permPerson"><option value="">— Select person —</option></select>
+        <div id="permEditor" hidden>
+          <div class="permGroup"><b>Permissions</b>
+            <label class="chip"><input type="checkbox" id="permGrocery"> Grocery details (add/edit grocery spending)</label>
+            <label class="chip"><input type="checkbox" id="permFunds"> Funds (add funds for permitted people)</label>
+            <label class="chip"><input type="checkbox" id="permMeals"> Meals (add meal details for permitted people)</label>
+          </div>
+          <div class="permGroup"><b>Select who's</b><div class="muted small">Choose whose behalf this person may enter fund or meal data for.</div><div id="permWho" class="permChips"></div></div>
+          <button id="savePerms">Save permissions</button>
+        </div>
+      </div>
     </section>
   </div>
 </main>
