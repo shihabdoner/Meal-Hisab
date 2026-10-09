@@ -83,7 +83,39 @@ function applyRole() {
 }
 
 // ---------- Rendering ----------
+function relDate(d) {
+  if (!d) return "N/A";
+  if (d === todayIso) return "TODAY";
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  if (d === iso(y)) return "YESTERDAY";
+  return new Date(d + "T00:00:00").toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// Personal numbers for the signed-in person.
+// meal rate = total spending to date / total meals to date; residual = deposits to date - my meals x rate;
+// advance = deposits dated after today.
+function myStats() {
+  const name = me.name, upto = d => d <= todayIso;
+  const mealsOf = n => S.mealDates.filter(upto).reduce((t, d) => t + num(S.meals[d][n]), 0);
+  const totalMeals = NAMES.reduce((t, n) => t + mealsOf(n), 0);
+  const spent = S.spending.filter(e => upto(e.date)).reduce((t, e) => t + num(e.amount), 0);
+  const rate = totalMeals > 0 ? spent / totalMeals : 0;
+  const dep = S.depDates.reduce((t, d) => t + num(S.deposits[d][name]), 0);
+  const advance = S.depDates.filter(d => !upto(d)).reduce((t, d) => t + num(S.deposits[d][name]), 0);
+  const meals = mealsOf(name);
+  return { dep, advance, meals, rate, totalMeals, residual: (dep - advance) - meals * rate };
+}
+
 function render() {
+  const st = myStats();
+  $("myDep").textContent = fmt(st.dep);
+  $("myAdv").textContent = fmt(st.advance);
+  $("myRes").textContent = fmt(st.residual);
+  $("resCard").classList.toggle("neg", st.residual < 0);
+  $("resNote").textContent = st.totalMeals > 0 ? `${st.meals} meals × ${fmt(st.rate)}` : "No meals recorded yet";
+  const lastBazar = [...S.spending].filter(e => e.date <= todayIso && num(e.amount) > 0).sort((x, y) => x.date.localeCompare(y.date)).pop();
+  $("lastDate").textContent = relDate(lastBazar && lastBazar.date);
+
   const fund = S.depDates.reduce((t, d) => t + NAMES.reduce((u, n) => u + num(S.deposits[d][n]), 0), 0);
   const spent = S.spending.filter(e => e.date <= todayIso);
   const out = spent.reduce((t, e) => t + num(e.amount), 0);
@@ -133,7 +165,7 @@ function table(head, rows, total, hl) {
   const tb = t.createTBody();
   rows.forEach(([key, ...cells]) => {
     const tr = tb.insertRow(); if (key === hl) tr.className = "today";
-    [lab(key), ...cells].forEach(c => { tr.insertCell().textContent = c === undefined || c === null ? "" : c; });
+    [lab(key), ...cells].forEach(c => { const td = tr.insertCell(); td.textContent = c === undefined || c === null ? "" : c; if (String(c).includes("\n")) td.style.whiteSpace = "pre-line"; });
   });
   if (total) { const tr = tb.insertRow(); tr.className = "total"; total.forEach(c => { tr.insertCell().textContent = c; }); }
   return t;
