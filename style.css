@@ -127,3 +127,17 @@ textarea[readonly]{opacity:.75;cursor:not-allowed}
   main{display:none!important}
   #report{display:block!important}
 }
+
+/* Admin alerts + permissions */
+.alertBar{background:#2b0a0a;border:2px solid #ff0000;border-radius:6px;padding:10px;margin-bottom:10px;font-family:"Exo 2",sans-serif}
+.alertHead{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#ff5a5a;font-weight:700;margin-bottom:6px}
+.alertHead button,.secAlert button{padding:6px 12px;font-size:.85rem}
+.alertLine{font-size:.82rem;color:#ffb4b4;padding:2px 0;white-space:pre-line}
+.alertDot{display:inline-block;margin-left:6px;padding:0 7px;border-radius:10px;background:#ff0000;color:#fff;font-size:.75rem;font-weight:700;animation:fade 1.5s infinite}
+.secAlert{border:2px dashed #ff0000;border-radius:6px;padding:8px;margin:6px 0;background:#2b0a0a;font-family:"Exo 2",sans-serif}
+.secAlert button{margin-top:6px}
+.perm{margin-top:6px;padding-top:8px;border-top:1px dashed #2b6b2b}
+.permTitle{font-size:.8rem;color:#9a9a9a;margin-bottom:4px}
+.permChips{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:6px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:.9rem;color:#fff;margin-bottom:6px}
+.chip input{width:auto;padding:0;margin:0}
