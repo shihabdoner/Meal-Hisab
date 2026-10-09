@@ -69,7 +69,7 @@ async function refresh(force) {
   try {
     S = await api("load"); me = S.me; setLive(true);
     $("login").hidden = true; $("app").hidden = false;
-    applyRole(); render(); syncMeal();
+    applyRole(); render(); renderAlerts(); syncMeal();
   } catch (e) {
     if (/group list/i.test(e.message)) showLogin(e.message + ". Ask the admin to add this email.", true);
     else { setLive(false); if (!me) showLogin("Could not reach the sheet: " + e.message, true); }
@@ -79,6 +79,7 @@ async function refresh(force) {
 function applyRole() {
   $("me").textContent = `${me.name} · ${me.admin ? "Admin" : "Member"}`;
   document.querySelectorAll(".adminOnly").forEach(el => el.hidden = !me.admin);
+  $("spendAddBox").hidden = !(me.admin || me.addSpending);
   if (!$("who").value && NAMES.includes(me.name)) { $("who").value = me.name; }
   if (me.admin && !$("memberList").contains(document.activeElement)) renderMembers();
 }
@@ -131,6 +132,7 @@ function render() {
 
   const who = $("who").value;
   $("person").hidden = !who;
+  $("depForm").hidden = !(who && (me.admin || (me.addFor || []).includes(who)));
   if (who) {
     const mine = S.depDates.filter(d => num(S.deposits[d][who]) > 0);
     $("pt").textContent = fmt(mine.reduce((t, d) => t + num(S.deposits[d][who]), 0));
@@ -194,6 +196,22 @@ function renderMembers() {
       mk.onclick = () => { if (confirm(`Make ${name} the admin? You will become a regular member.`)) act("makeAdmin", { email: u.email }); };
       row.appendChild(mk);
     }
+    if (u && !u.admin) {
+      const perm = document.createElement("div"); perm.className = "perm";
+      const pt = document.createElement("div"); pt.className = "permTitle"; pt.textContent = "Can add funds & meal details for (add only):";
+      const chips = document.createElement("div"); chips.className = "permChips"; const boxes = {};
+      NAMES.forEach(n => {
+        const l = document.createElement("label"); l.className = "chip";
+        const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = (u.addFor || []).includes(n); boxes[n] = cb;
+        l.append(cb, " " + n); chips.appendChild(l);
+      });
+      const sl = document.createElement("label"); sl.className = "chip";
+      const sc = document.createElement("input"); sc.type = "checkbox"; sc.checked = !!u.addSpending;
+      sl.append(sc, " Can add grocery spending (add only)");
+      const sv = document.createElement("button"); sv.textContent = "Save permissions";
+      sv.onclick = () => act("savePerms", { email: u.email, addFor: NAMES.filter(n => boxes[n].checked), addSpending: sc.checked });
+      perm.append(pt, chips, sl, sv); row.appendChild(perm);
+    }
     box.appendChild(row);
   });
 }
@@ -212,13 +230,30 @@ $("depForm").addEventListener("submit", async e => {
 
 // ---------- Meals: lunch/dinner boxes (sheet cell = number of meals; text kept in the MealDetails tab) ----------
 const noteKey = () => `${$("who").value}|${$("mealDate").value}`;
-const canEditMeal = () => !!(me && S && (me.admin || $("who").value === me.name) && S.mealDates.includes($("mealDate").value));
-function setEditable() {
-  const ok = canEditMeal();
-  $("lunch").readOnly = !ok; $("dinner").readOnly = !ok;
+// full = admin or own meals (auto-save). add = permitted person adding for someone else (fill empty boxes, press Save).
+function mealMode() {
   const who = $("who").value;
-  $("status").textContent = !who || !S ? "" : !S.mealDates.includes($("mealDate").value) ? "This date is not in the sheet"
-    : !ok ? "View only — only this person or the admin can edit" : "Tip: a box with 1 (or any text) counts as that many meals in the sheet";
+  if (!me || !S || !who || !S.mealDates.includes($("mealDate").value)) return null;
+  if (me.admin || who === me.name) return "full";
+  if ((me.addFor || []).includes(who)) return "add";
+  return null;
+}
+function setEditable() {
+  const mode = mealMode(), who = $("who").value, date = $("mealDate").value;
+  let roL = true, roD = true;
+  if (mode === "full") { roL = false; roD = false; }
+  else if (mode === "add") {
+    const n = ((S && S.mealNotes) || {})[`${who}|${date}`] || { lunch: "", dinner: "" };
+    const cell = S.meals[date] ? S.meals[date][who] : "";
+    const locked = cell !== "" && cell != null && cell !== "N/A" && !n.lunch && !n.dinner;
+    roL = locked || !!n.lunch; roD = locked || !!n.dinner;
+  }
+  $("lunch").readOnly = roL; $("dinner").readOnly = roD;
+  $("mealSave").hidden = !(mode === "add" && (!roL || !roD));
+  $("status").textContent = !who || !S ? "" : !S.mealDates.includes(date) ? "This date is not in the sheet"
+    : mode === "add" ? "Add-only: fill an empty box and press Save. Saved entries can only be changed by the admin."
+    : mode === "full" ? "Tip: a box with 1 (or any text) counts as that many meals in the sheet"
+    : "View only — only this person, the admin or a permitted person can add";
 }
 function syncMeal() {
   if (!$("who").value) return;
@@ -227,19 +262,22 @@ function syncMeal() {
   if (document.activeElement !== $("dinner")) $("dinner").value = n.dinner;
   setEditable();
 }
+async function sendMeal() {
+  $("status").textContent = "Saving…";
+  try {
+    await api("setMeal", { person: $("who").value, date: $("mealDate").value, lunch: $("lunch").value, dinner: $("dinner").value });
+    $("status").textContent = "Saved to sheet ✓";
+    refresh(true);
+  } catch (e) { $("status").textContent = "Save failed: " + e.message; }
+}
 let t;
-function saveMeal() {
-  if (!canEditMeal()) return;
+function saveMeal() {                       // auto-save (full mode only)
+  if (mealMode() !== "full") return;
   $("status").textContent = "Saving…";
   clearTimeout(t);
-  t = setTimeout(async () => {
-    try {
-      await api("setMeal", { person: $("who").value, date: $("mealDate").value, lunch: $("lunch").value, dinner: $("dinner").value });
-      $("status").textContent = "Saved to sheet ✓";
-      refresh();
-    } catch (e) { $("status").textContent = "Save failed: " + e.message; }
-  }, 600);
+  t = setTimeout(sendMeal, 600);
 }
+$("mealSave").onclick = () => { if (mealMode() === "add") sendMeal(); };
 ["lunch", "dinner"].forEach(i => $(i).addEventListener("input", saveMeal));
 $("who").addEventListener("change", () => { $("lunch").value = ""; $("dinner").value = ""; render(); syncMeal(); });
 $("mealDate").addEventListener("change", () => { $("lunch").value = ""; $("dinner").value = ""; syncMeal(); });
@@ -306,3 +344,32 @@ function printReport(parts) {
 document.querySelectorAll("[data-p]").forEach(b => {
   b.onclick = () => printReport(b.dataset.p === "all" ? ["my", "fund", "bazar"] : [b.dataset.p]);
 });
+
+
+// ---------- Alerts for the admin (entries made by permitted people) ----------
+function alertLine(x) {
+  const d = document.createElement("div"); d.className = "alertLine";
+  const when = new Date(x.time); const ts = isNaN(when) ? "" : when.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  d.textContent = `${ts} · ${x.by}: ${x.detail}`; return d;
+}
+function renderAlerts() {
+  const list = (S && S.alerts) || [];
+  const bar = $("alertBar"); bar.textContent = ""; bar.hidden = !list.length;
+  if (list.length) {
+    const head = document.createElement("div"); head.className = "alertHead";
+    const tt = document.createElement("span"); tt.textContent = `⚠ ${list.length} new ${list.length > 1 ? "entries" : "entry"} by permitted people`;
+    const b = document.createElement("button"); b.textContent = "Acknowledged"; b.onclick = () => act("ackAlerts", { all: true });
+    head.append(tt, b); bar.appendChild(head);
+    list.slice(-8).reverse().forEach(x => bar.appendChild(alertLine(x)));
+    if (list.length > 8) { const m = document.createElement("div"); m.className = "alertLine"; m.textContent = `+ ${list.length - 8} more`; bar.appendChild(m); }
+  }
+  ["deposit", "spending", "meal"].forEach(type => {
+    const items = list.filter(x => x.type === type);
+    document.querySelectorAll(`.alertDot[data-alert="${type}"]`).forEach(el => { el.hidden = !items.length; el.textContent = `⚠ ${items.length}`; });
+    document.querySelectorAll(`.secAlert[data-alert="${type}"]`).forEach(el => {
+      el.textContent = ""; el.hidden = !items.length; if (!items.length) return;
+      items.slice().reverse().forEach(x => el.appendChild(alertLine(x)));
+      const b = document.createElement("button"); b.textContent = "Acknowledged"; b.onclick = () => act("ackAlerts", { type }); el.appendChild(b);
+    });
+  });
+}
