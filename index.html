@@ -31,7 +31,14 @@
   <div id="app" hidden>
     <div class="topbar"><span id="me"></span><span><button id="refresh" title="Reload from sheet">⟳</button> <button id="out">Sign out</button></span></div>
 
-    <div class="grid">
+    <div class="grid mine">
+      <div class="card"><div class="k">My deposit to fund</div><div class="v" id="myDep">৳0</div></div>
+      <div class="card" id="resCard"><div class="k">My residual</div><div class="v" id="myRes">৳0</div><div class="muted small" id="resNote"></div></div>
+      <div class="card"><div class="k">My advance</div><div class="v" id="myAdv">৳0</div></div>
+      <div class="card"><div class="k">সর্বশেষ বাজারের তারিখ</div><div class="v" id="lastDate">N/A</div></div>
+    </div>
+
+    <div class="grid" style="margin-top:10px">
       <div class="card wide"><div class="k">Last grocery spending</div><div class="v" id="last">N/A</div><div class="muted" id="lastd"></div></div>
       <div class="card"><div class="k">Total fund</div><div class="v" id="fund">৳0</div></div>
       <div class="card"><div class="k">Total spending</div><div class="v" id="spent">৳0</div></div>
@@ -43,7 +50,7 @@
       <form id="spForm" class="form">
         <input id="spAmt" type="number" min="0" step="any" placeholder="Amount" required>
         <input id="spDate" type="date" required>
-        <input id="spDet" type="text" placeholder="Details (what was bought)">
+        <textarea id="spDet" rows="3" placeholder="Details (what was bought) — Enter for a new line"></textarea>
         <button>Add</button>
       </form>
     </details>
