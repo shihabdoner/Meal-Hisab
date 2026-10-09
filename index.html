@@ -29,19 +29,28 @@
 
   <!-- App (signed-in members only) -->
   <div id="app" hidden>
-    <div class="topbar"><div><span id="me"></span><div class="month" id="monthLabel"></div></div><span><button id="refresh" title="Reload from sheet">⟳</button> <button id="out">Sign out</button></span></div>
+    <div class="topbar">
+      <div class="topIdentity"><span id="me"></span><div class="month" id="monthLabel"></div></div>
+      <select id="adminPreview" class="adminPreview" aria-label="Preview a member's interface" hidden></select>
+      <span><button id="refresh" title="Reload from sheet">⟳</button> <button id="out">Sign out</button></span>
+    </div>
+    <div id="previewNotice" class="notice" hidden>Preview mode: this is the selected member’s interface. Editing is switched off while previewing.</div>
 
     <div id="alertBar" class="alertBar" hidden></div>
 
     <div class="grid mine">
-      <div class="card"><div class="k">My deposit to fund</div><div class="v" id="myDep">৳0</div></div>
-      <div class="card" id="resCard"><div class="k">My residual</div><div class="v" id="myRes">৳0</div><div class="muted small" id="resNote"></div></div>
-      <div class="card" id="dueCard"><div class="k">My Due</div><div class="v" id="myDue">৳0</div></div>
-      <div class="card"><div class="k">সর্বশেষ বাজারের তারিখ</div><div class="v" id="lastDate">N/A</div></div>
+      <div class="card wide"><div class="k">My deposit to fund</div><div class="v" id="myDep">৳0</div></div>
+      <div class="card" id="resFundCard"><div class="k">My residual in fund</div><div class="v" id="myResFund">৳0</div><div class="muted small" id="resFundNote"></div></div>
+      <div class="card" id="resCard"><div class="k">My residual in spending</div><div class="v" id="myRes">৳0</div><div class="muted small" id="resNote"></div></div>
+      <div class="card" id="dueFundCard"><div class="k">My due in fund</div><div class="v" id="myDueFund">৳0</div></div>
+      <div class="card" id="dueCard"><div class="k">My due in spending</div><div class="v" id="myDue">৳0</div></div>
+      <div class="card"><div class="k">Most recent added fund</div><div class="v" id="lastFund">N/A</div><div class="muted small" id="lastFundMeta"></div></div>
+      <div class="card"><div class="k">Most recent added fund by me</div><div class="v" id="lastFundMine">N/A</div><div class="muted small" id="lastFundMineMeta"></div></div>
+      <div class="card wide lastDateCard"><div class="k">সর্বশেষ বাজারের তারিখ</div><div class="v" id="lastDate">N/A</div></div>
     </div>
 
     <div class="grid" style="margin-top:10px">
-      <div class="card wide"><div class="k">Last grocery spending</div><div class="v" id="last">N/A</div><div class="muted" id="lastd"></div></div>
+      <div class="card wide"><div class="k">Last grocery spending</div><div class="v" id="last">N/A</div><div class="muted lastd" id="lastd"></div></div>
       <div class="card"><div class="k">Total fund</div><div class="v" id="fund">৳0</div></div>
       <div class="card"><div class="k">Total spending</div><div class="v" id="spent">৳0</div></div>
       <div class="card wide left" id="leftcard"><div class="k">Money left in the fund until today</div><div class="v" id="left">৳0</div></div>
@@ -72,36 +81,44 @@
       <div id="spList"></div>
     </details>
 
-    <h2 class="flick">Individual details</h2>
-    <select id="who">
-      <option value="">— নাম নির্বাচন করুন —</option>
-      <option>Shohan</option><option>Naved</option><option>Salman</option>
-      <option>Rifat</option><option>Shihab</option><option>Ashmit</option>
-    </select>
-
-    <section class="card" id="person" hidden>
-      <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
-      <div style="margin-top:10px"><b>জমাদানের তথ্য</b></div>
-      <div id="deps" class="muted"></div>
-      <form id="depForm" class="form" hidden>
-        <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" required>
-        <input id="depDate" type="date" required>
-        <button>+ Add deposit</button>
-      </form>
-
-      <h2 class="flick">Meal details</h2>
-      <input id="mealDate" type="date" class="mdate">
-      <div class="tablewrap">
-        <table>
-          <tr><th>দুপুর</th><th>রাত</th></tr>
-          <tr>
-            <td><textarea id="lunch" aria-label="দুপুর"></textarea></td>
-            <td><textarea id="dinner" aria-label="রাত"></textarea></td>
-          </tr>
-        </table>
+    <h2 class="flick">Fund details</h2>
+    <section class="card detailSection" id="fundSection">
+      <label for="fundWho">Select person</label>
+      <select id="fundWho"></select>
+      <div id="fundPerson" hidden>
+        <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
+        <div style="margin-top:10px"><b>জমাদানের তথ্য</b></div>
+        <div id="deps" class="muted"></div>
+        <form id="depForm" class="form" hidden>
+          <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" required>
+          <input id="depDate" type="date" required>
+          <button>+ Add deposit</button>
+        </form>
       </div>
-      <button id="mealSave" style="margin-top:8px" hidden>Save (add only)</button>
-      <div class="status" id="status"></div>
+    </section>
+
+    <h2 class="flick">Meal details</h2>
+    <section class="card detailSection" id="mealSection">
+      <label for="mealWho">Select person</label>
+      <select id="mealWho"></select>
+      <div id="mealPerson" hidden>
+        <div style="margin-top:6px"><b>Meal history</b></div>
+        <div id="mealHistory" class="historyList"></div>
+        <div class="mealEditor">
+          <label for="mealDate">Entry date</label>
+          <input id="mealDate" type="date" class="mdate">
+          <div class="tablewrap">
+            <table>
+              <tr><th>দুপুর</th><th>রাত</th></tr>
+              <tr><td><textarea id="lunch" aria-label="দুপুর"></textarea></td><td><textarea id="dinner" aria-label="রাত"></textarea></td></tr>
+            </table>
+          </div>
+          <label for="mealBazar">বাজারকর্তা</label>
+          <select id="mealBazar"></select>
+          <button id="mealSave" style="margin-top:8px" hidden>Save (add only)</button>
+          <div class="status" id="status"></div>
+        </div>
+      </div>
     </section>
 
     <h2 class="flick">Sheet view</h2>
@@ -111,8 +128,25 @@
 
     <h2 class="flick adminOnly" hidden>Group admin</h2>
     <section class="card adminOnly" id="adminPanel" hidden>
-      <div class="muted" style="margin-bottom:8px">Add each person's Google email. "Make admin" hands over admin to that person and you become a regular member.</div>
+      <div class="muted" style="margin-bottom:8px">Add each person's Google email. “Make admin” hands over admin to that person and you become a regular member.</div>
       <div id="memberList"></div>
+      <div class="permissionBox">
+        <h3>Member permissions</h3>
+        <label for="permPerson">Persons</label>
+        <select id="permPerson"></select>
+        <div id="permEditor" hidden>
+          <div class="permGroup"><b>Permissions</b>
+            <label class="chip"><input type="checkbox" id="permGrocery"> Grocery details (add grocery spending)</label>
+            <label class="chip"><input type="checkbox" id="permFunds"> Funds (add funds for the people selected below)</label>
+            <label class="chip"><input type="checkbox" id="permMeals"> Meals (add meal details for the people selected below)</label>
+          </div>
+          <div class="permGroup"><b>Select who's</b>
+            <div class="muted small">Whose funds and meal details this person may add on their behalf.</div>
+            <div id="permWho" class="permChips"></div>
+          </div>
+          <button id="savePerms">Save permissions</button>
+        </div>
+      </div>
     </section>
   </div>
 </main>
