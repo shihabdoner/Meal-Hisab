@@ -1,13 +1,15 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { firebaseConfig, SCRIPT_URL } from "./firebase-config.js";
 
 const $ = id => document.getElementById(id);
 const NAMES = ["Shohan", "Naved", "Salman", "Rifat", "Shihab", "Ashmit"];
 const fmt = n => "৳" + (Math.round(n * 100) / 100).toLocaleString("en-US");
-const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const todayIso = iso(new Date());
+const monthKey = todayIso.slice(0, 7);
 const num = x => { const n = Number(x); return (x === "" || x == null || isNaN(n)) ? 0 : n; };
 const lab = d => new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
@@ -15,13 +17,34 @@ $("monthLabel").textContent = new Date().toLocaleDateString("en-US", { month: "l
 $("today").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 ["spDate", "depDate", "mealDate"].forEach(i => $(i).value = todayIso);
 
+function fillNameSelect(id, blankLabel, exclude) {
+  const sel = $(id), keep = sel.value;
+  sel.textContent = "";
+  if (blankLabel !== undefined) {
+    const o = document.createElement("option"); o.value = ""; o.textContent = blankLabel; sel.appendChild(o);
+  }
+  NAMES.filter(n => n !== exclude).forEach(n => {
+    const o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o);
+  });
+  if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+}
+fillNameSelect("fundWho", "— নাম নির্বাচন করুন —");
+fillNameSelect("mealWho", "— নাম নির্বাচন করুন —");
+fillNameSelect("mealBazar", "— বাজারকর্তা নির্বাচন করুন —");
+
 if (SCRIPT_URL.startsWith("PASTE_")) { $("setup").hidden = false; throw new Error("SCRIPT_URL not set"); }
 
 const auth = getAuth(initializeApp(firebaseConfig));
-let me = null, S = null, busy = false, poll = null;
+let me = null;            // the real signed-in user (from the sheet's Members tab)
+let U = null;             // the user whose interface is shown (= me, or a member while the admin previews)
+let S = null, busy = false, poll = null, previewName = "";
+let inlineOpen = false, permDirty = false;
+const mealDirty = { lunch: false, dinner: false, bazar: false };
 
 // ---------- API (Google Apps Script web app on top of the sheet) ----------
+const isPreview = () => !!(me && me.admin && previewName);
 async function api(action, payload = {}) {
+  if (action !== "load" && isPreview()) throw new Error("Preview mode: switch back to “Your admin view” to make changes.");
   const idToken = await auth.currentUser.getIdToken();
   const r = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action, idToken, ...payload }) });
   const j = await r.json();
@@ -29,8 +52,8 @@ async function api(action, payload = {}) {
   return j;
 }
 async function act(action, payload) {
-  try { await api(action, payload); await refresh(true); }
-  catch (e) { alert(e.message); }
+  try { await api(action, payload); await refresh(true); return true; }
+  catch (e) { alert(e.message); return false; }
 }
 
 // ---------- Sign-in ----------
@@ -55,7 +78,7 @@ function showLogin(msg, denied) {
 function setLive(on) { const l = $("live"); l.textContent = on ? "● live" : "● offline"; l.className = "live " + (on ? "on" : "off"); }
 
 onAuthStateChanged(auth, user => {
-  clearInterval(poll); me = null; S = null; setLive(false);
+  clearInterval(poll); me = null; U = null; S = null; previewName = ""; setLive(false);
   if (!user) return showLogin();
   $("loginMsg").textContent = "Loading…";
   refresh(true);
@@ -76,15 +99,45 @@ async function refresh(force) {
   } finally { busy = false; }
 }
 
+// ---------- Who is the interface for (admin preview) ----------
+function effectiveMember() {
+  const m = (S.members || []).find(x => x.name === previewName);
+  return m || { name: previewName, email: "", admin: false, addFor: [], canGrocery: false, canFunds: false, canMeals: false };
+}
+function buildPreviewSelect() {
+  const sel = $("adminPreview");
+  if (sel.dataset.for === me.name) return;
+  sel.dataset.for = me.name; sel.textContent = "";
+  const own = document.createElement("option"); own.value = ""; own.textContent = "Your admin view"; sel.appendChild(own);
+  NAMES.filter(n => n !== me.name).forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o); });
+  sel.value = previewName;
+}
+$("adminPreview").addEventListener("change", () => {
+  previewName = $("adminPreview").value;
+  const who = previewName || me.name;
+  $("fundWho").value = who; $("mealWho").value = who;
+  resetMealDirty(); inlineOpen = false;
+  applyRole(); render(); renderAlerts(); syncMeal();
+});
+
 function applyRole() {
-  $("me").textContent = `${me.name} · ${me.admin ? "Admin" : "Member"}`;
-  document.querySelectorAll(".adminOnly").forEach(el => el.hidden = !me.admin);
-  $("spendAddBox").hidden = !(me.admin || me.addSpending);
-  if (!$("who").value && NAMES.includes(me.name)) { $("who").value = me.name; }
-  if (me.admin && !$("memberList").contains(document.activeElement)) renderMembers();
+  if (!me.admin) previewName = "";
+  U = isPreview() ? effectiveMember() : me;
+  $("me").textContent = `${me.name} · ${me.admin ? "Admin" : "Member"}${isPreview() ? " (previewing " + previewName + ")" : ""}`;
+  $("app").classList.toggle("previewing", isPreview());
+  $("previewNotice").hidden = !isPreview();
+  $("adminPreview").hidden = !me.admin;
+  if (me.admin) buildPreviewSelect();
+  document.querySelectorAll(".adminOnly").forEach(el => { el.hidden = !U.admin; });
+  $("spendAddBox").hidden = !(U.admin || U.canGrocery);
+  ["fundWho", "mealWho"].forEach(id => { if (!$(id).value && NAMES.includes(U.name)) $(id).value = U.name; });
+  if (U.admin) {
+    if (!$("memberList").contains(document.activeElement)) renderMembers();
+    if (!permDirty && !$("permEditor").contains(document.activeElement)) renderPermissionEditor();
+  }
 }
 
-// ---------- Rendering ----------
+// ---------- Numbers ----------
 function relDate(d) {
   if (!d) return "N/A";
   if (d === todayIso) return "TODAY";
@@ -93,67 +146,187 @@ function relDate(d) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
 }
 
-// Equal split: this month's total spending / number of people. Balance = my deposit - my share.
+// ---- stats (pure) ----
+// "in spending": my deposit - (this month's spending / people).  "in fund": my deposit - (total fund / people).
 // Positive balance = residual, negative = due.
-const monthKey = todayIso.slice(0, 7);
-const monthSpent = () => S.spending.filter(e => e.date.slice(0, 7) === monthKey).reduce((t, e) => t + num(e.amount), 0);
-function balanceOf(n) {
-  const share = monthSpent() / NAMES.length;
-  const dep = S.depDates.reduce((t, d) => t + num(S.deposits[d][n]), 0);
-  return { dep, share, bal: Math.round((dep - share) * 100) / 100 };
+function statsFor(S, name, email) {
+  const r2 = x => Math.round(x * 100) / 100;
+  const monthSpent = S.spending.filter(e => e.date.slice(0, 7) === monthKey).reduce((t, e) => t + num(e.amount), 0);
+  const dep = S.depDates.reduce((t, d) => t + num(S.deposits[d][name]), 0);
+  const fundTotal = S.depDates.reduce((t, d) => t + NAMES.reduce((u, n) => u + num(S.deposits[d][n]), 0), 0);
+  const spendShare = monthSpent / NAMES.length, fundShare = fundTotal / NAMES.length;
+  const entries = [];
+  S.depDates.forEach(d => NAMES.forEach(n => {
+    const amount = num(S.deposits[d][n]);
+    if (amount > 0) entries.push({ date: d, person: n, amount, by: (S.depMeta || {})[d + "|" + n] || null });
+  }));
+  entries.sort((a, b) => a.date.localeCompare(b.date));
+  const mine = entries.filter(e => e.by && email && e.by.email === email);
+  return { dep, monthSpent, fundTotal, spendShare, fundShare,
+    balSpend: r2(dep - spendShare), balFund: r2(dep - fundShare),
+    lastFund: entries[entries.length - 1] || null, lastFundByMe: mine[mine.length - 1] || null };
 }
+// ---- end stats ----
+const balanceOf = n => { const s = statsFor(S, n); return { dep: s.dep, share: s.spendShare, bal: s.balSpend }; };
+const monthSpent = () => statsFor(S, NAMES[0]).monthSpent;
 
+const dateChip = d => { const b = document.createElement("b"); b.className = "sp-date"; b.textContent = d; return b; };
+
+// ---------- Rendering ----------
 function render() {
-  const m = balanceOf(me.name);
-  $("myDep").textContent = fmt(m.dep);
-  $("myRes").textContent = fmt(Math.max(m.bal, 0));
-  $("myDue").textContent = fmt(Math.max(-m.bal, 0));
-  $("dueCard").classList.toggle("neg", m.bal < 0);
-  $("resNote").textContent = `Share ${fmt(m.share)} (${fmt(monthSpent())} ÷ ${NAMES.length})`;
-  const lastBazar = [...S.spending].filter(e => e.date <= todayIso && num(e.amount) > 0).sort((x, y) => x.date.localeCompare(y.date)).pop();
-  $("lastDate").textContent = relDate(lastBazar && lastBazar.date);
+  const st = statsFor(S, U.name, U.email);
+  $("myDep").textContent = fmt(st.dep);
+  $("myResFund").textContent = fmt(Math.max(st.balFund, 0));
+  $("myDueFund").textContent = fmt(Math.max(-st.balFund, 0));
+  $("resFundNote").textContent = `Fund share ${fmt(st.fundShare)} (${fmt(st.fundTotal)} ÷ ${NAMES.length})`;
+  $("dueFundCard").classList.toggle("neg", st.balFund < 0);
+  $("myRes").textContent = fmt(Math.max(st.balSpend, 0));
+  $("myDue").textContent = fmt(Math.max(-st.balSpend, 0));
+  $("resNote").textContent = `Share ${fmt(st.spendShare)} (${fmt(st.monthSpent)} ÷ ${NAMES.length})`;
+  $("dueCard").classList.toggle("neg", st.balSpend < 0);
 
-  const fund = S.depDates.reduce((t, d) => t + NAMES.reduce((u, n) => u + num(S.deposits[d][n]), 0), 0);
+  const lf = st.lastFund, lm = st.lastFundByMe;
+  $("lastFund").textContent = lf ? fmt(lf.amount) : "N/A";
+  $("lastFundMeta").textContent = lf ? `${lf.date} · ${lf.person}` : "";
+  $("lastFundMine").textContent = lm ? fmt(lm.amount) : "N/A";
+  $("lastFundMineMeta").textContent = lm ? `${lm.date} · for ${lm.person}` : "";
+
   const spent = S.spending.filter(e => e.date <= todayIso);
+  const lastBazar = [...spent].filter(e => num(e.amount) > 0).sort((a, b) => a.date.localeCompare(b.date)).pop();
+  $("lastDate").textContent = relDate(lastBazar && lastBazar.date);
   const out = spent.reduce((t, e) => t + num(e.amount), 0);
-  $("fund").textContent = fmt(fund);
+  $("fund").textContent = fmt(st.fundTotal);
   $("spent").textContent = fmt(out);
-  $("left").textContent = fmt(fund - out);
-  $("leftcard").classList.toggle("neg", fund - out < 0);
-  const last = [...spent].filter(e => num(e.amount) > 0).sort((a, b) => a.date.localeCompare(b.date)).pop();
-  $("last").textContent = last ? fmt(num(last.amount)) : "N/A";
-  $("lastd").textContent = last ? `${last.date}${last.details && last.details !== "N/A" ? " · " + last.details : ""}` : "";
-
-  const sl = $("spList"); sl.textContent = "";
-  const sp = S.spending.filter(e => num(e.amount) > 0).sort((a, b) => b.date.localeCompare(a.date));
-  if (!sp.length) sl.textContent = "No spending yet";
-  sp.forEach(e => sl.appendChild(rowEl(`${e.date}${e.details && e.details !== "N/A" ? " · " + e.details : ""}`, fmt(num(e.amount)),
-    me.admin && (() => act("clearSpending", { date: e.date })))));
-
-  const who = $("who").value;
-  $("person").hidden = !who;
-  $("depForm").hidden = !(who && (me.admin || (me.addFor || []).includes(who)));
-  if (who) {
-    const mine = S.depDates.filter(d => num(S.deposits[d][who]) > 0);
-    $("pt").textContent = fmt(mine.reduce((t, d) => t + num(S.deposits[d][who]), 0));
-    const dl = $("deps"); dl.textContent = "";
-    if (!mine.length) dl.textContent = "এখনো কোনো জমা নেই";
-    mine.forEach(d => dl.appendChild(rowEl(d, fmt(num(S.deposits[d][who])), me.admin && (() => act("clearDeposit", { date: d, person: who })))));
+  $("left").textContent = fmt(st.fundTotal - out);
+  $("leftcard").classList.toggle("neg", st.fundTotal - out < 0);
+  $("last").textContent = lastBazar ? fmt(num(lastBazar.amount)) : "N/A";
+  const ld = $("lastd"); ld.textContent = "";
+  if (lastBazar) {
+    ld.appendChild(dateChip(lastBazar.date));
+    const det = lastBazar.details && lastBazar.details !== "N/A" ? lastBazar.details : "";
+    const baz = (S.bazar || {})[lastBazar.date];
+    if (det) ld.append(" · " + det);
+    if (baz) ld.append(" · বাজারকর্তা: " + baz);
   }
+
+  if (!inlineOpen) renderHistories();
+  const mealWho = $("mealWho").value;
+  $("mealPerson").hidden = !mealWho;
+  if (mealWho) renderMealHistory(mealWho);
   renderTables();
 }
 
-function rowEl(left, right, onDel) {
-  const r = document.createElement("div"); r.className = "row";
-  const a = document.createElement("span"); a.textContent = left;
-  const b = document.createElement("span");
-  const v = document.createElement("b"); v.textContent = right; b.appendChild(v);
-  if (onDel) {
+const latestSpendingDate = () => {
+  const l = S.spending.filter(e => num(e.amount) > 0).map(e => e.date).sort().pop();
+  return l || "";
+};
+const canEditSpending = e => U.admin || !!(U.canGrocery && e.date === latestSpendingDate() && e.addedByEmail && e.addedByEmail === U.email);
+const canFundFor = who => !!(who && (U.admin || (U.canFunds && (U.addFor || []).includes(who))));
+
+function renderHistories() {
+  // grocery history (all dates, from the Grocery Spending table)
+  const sl = $("spList"); sl.textContent = "";
+  const sp = S.spending.filter(e => num(e.amount) > 0).sort((a, b) => b.date.localeCompare(a.date));
+  if (!sp.length) sl.textContent = "No spending yet";
+  sp.forEach(e => sl.appendChild(spendingRowEl(e)));
+
+  // fund history of the selected person (all dates, from the Deposits table)
+  const who = $("fundWho").value;
+  $("fundPerson").hidden = !who;
+  $("depForm").hidden = !canFundFor(who);
+  if (!who) return;
+  const mine = S.depDates.filter(d => num(S.deposits[d][who]) > 0).sort();
+  $("pt").textContent = fmt(mine.reduce((t, d) => t + num(S.deposits[d][who]), 0));
+  const dl = $("deps"); dl.textContent = "";
+  if (!mine.length) dl.textContent = "এখনো কোনো জমা নেই";
+  const latest = mine[mine.length - 1];
+  mine.slice().reverse().forEach(d => dl.appendChild(depositRowEl(d, who, d === latest)));
+}
+
+function actionsEl(editFn, delFn) {
+  const b = document.createElement("span"); b.className = "rowActions";
+  if (editFn) { const x = document.createElement("button"); x.className = "editBtn"; x.textContent = "Edit"; x.onclick = editFn; b.appendChild(x); }
+  if (delFn) {
     const x = document.createElement("button"); x.className = "x"; x.textContent = "✕"; x.title = "Clear";
-    x.onclick = () => { if (confirm("Clear this entry in the sheet?")) onDel(); };
+    x.onclick = () => { if (confirm("Clear this entry in the sheet?")) delFn(); };
     b.appendChild(x);
   }
-  r.append(a, b); return r;
+  return b;
+}
+function amountEl(text) { const v = document.createElement("b"); v.className = "amt"; v.textContent = text; return v; }
+
+function spendingRowEl(e) {
+  const r = document.createElement("div"); r.className = "row spendingRow";
+  const a = document.createElement("span"); a.className = "spendingDescription";
+  a.appendChild(dateChip(e.date));
+  const det = e.details && e.details !== "N/A" ? e.details : "", baz = (S.bazar || {})[e.date];
+  if (det) a.append(" · " + det);
+  if (baz) a.append(" · বাজারকর্তা: " + baz);
+  const right = document.createElement("span"); right.className = "rowRight";
+  right.append(amountEl(fmt(num(e.amount))),
+    actionsEl(canEditSpending(e) ? () => openInline(r, { title: `Edit grocery · ${e.date}`, amount: e.amount, details: det, withDetails: true,
+        save: (amount, details) => act("editSpending", { date: e.date, amount, details }) }) : null,
+      U.admin ? () => act("clearSpending", { date: e.date }) : null));
+  r.append(a, right);
+  return r;
+}
+function depositRowEl(d, who, isLatest) {
+  const amount = num(S.deposits[d][who]);
+  const r = document.createElement("div"); r.className = "row";
+  const a = document.createElement("span"); a.appendChild(dateChip(d));
+  const editable = U.admin || (who === U.name && isLatest);
+  const right = document.createElement("span"); right.className = "rowRight";
+  right.append(amountEl(fmt(amount)),
+    actionsEl(editable ? () => openInline(r, { title: `Edit ${who}'s fund · ${d} (total for this date)`, amount, withDetails: false,
+        save: amt => act("editDeposit", { date: d, person: who, amount: amt }) }) : null,
+      U.admin ? () => act("clearDeposit", { date: d, person: who }) : null));
+  r.append(a, right);
+  return r;
+}
+
+// Inline editor (keeps multi-line details). Stays open during the 15 s refresh.
+function openInline(rowNode, cfg) {
+  inlineOpen = true;
+  rowNode.textContent = ""; rowNode.classList.add("editing");
+  const f = document.createElement("form"); f.className = "inlineEdit";
+  const t = document.createElement("div"); t.className = "inlineTitle"; t.textContent = cfg.title;
+  const a = document.createElement("input"); a.type = "number"; a.step = "any"; a.min = "0"; a.required = true; a.value = cfg.amount;
+  f.append(t, a);
+  let d = null;
+  if (cfg.withDetails) { d = document.createElement("textarea"); d.rows = 4; d.value = cfg.details || ""; d.placeholder = "Details"; f.appendChild(d); }
+  const bar = document.createElement("div"); bar.className = "inlineBtns";
+  const ok = document.createElement("button"); ok.textContent = "Save";
+  const no = document.createElement("button"); no.type = "button"; no.textContent = "Cancel";
+  no.onclick = () => { inlineOpen = false; render(); };
+  bar.append(ok, no); f.appendChild(bar);
+  f.onsubmit = async ev => {
+    ev.preventDefault();
+    const done = await cfg.save(Number(a.value), d ? d.value : undefined);
+    if (done) { inlineOpen = false; render(); }
+  };
+  rowNode.appendChild(f); a.focus();
+}
+
+function renderMealHistory(name) {
+  const box = $("mealHistory"); box.textContent = "";
+  const rows = [];
+  S.mealDates.forEach(d => {
+    const cell = S.meals[d][name], has = cell !== "" && cell != null && cell !== "N/A";
+    const n = (S.mealNotes || {})[name + "|" + d];
+    if (has || (n && (n.lunch || n.dinner))) rows.push({ date: d, count: has ? cell : "", lunch: n && n.lunch, dinner: n && n.dinner, bazar: (S.bazar || {})[d] || "" });
+  });
+  rows.sort((a, b) => b.date.localeCompare(a.date));
+  if (!rows.length) { box.textContent = "No meal entries yet"; return; }
+  rows.forEach(e => {
+    const r = document.createElement("div"); r.className = "row mealHistoryRow";
+    const a = document.createElement("span"); a.className = "spendingDescription"; a.appendChild(dateChip(e.date));
+    const parts = [];
+    if (e.lunch || e.dinner) parts.push(`দুপুর: ${e.lunch || "—"} · রাত: ${e.dinner || "—"}`);
+    if (e.bazar) parts.push(`বাজারকর্তা: ${e.bazar}`);
+    if (parts.length) a.append(" · " + parts.join(" · "));
+    r.append(a, e.count !== "" ? amountEl(`${e.count} meal${num(e.count) === 1 ? "" : "s"}`) : document.createElement("span"));
+    box.appendChild(r);
+  });
 }
 
 function table(head, rows, total, hl) {
@@ -171,23 +344,23 @@ function table(head, rows, total, hl) {
 function renderTables() {
   const sums = (dates, src) => NAMES.map(n => dates.reduce((t, d) => t + num(src[d][n]), 0));
   const put = (id, el) => { const b = $(id); b.textContent = ""; b.appendChild(el); };
-  put("tblMeals", table(["Tarikh", ...NAMES], S.mealDates.map(d => [d, ...NAMES.map(n => S.meals[d][n])]),
-    ["Total meal", ...sums(S.mealDates, S.meals)], todayIso));
+  put("tblMeals", table(["Tarikh", ...NAMES, "বাজারকর্তা"], S.mealDates.map(d => [d, ...NAMES.map(n => S.meals[d][n]), (S.bazar || {})[d] || ""]),
+    ["Total meal", ...sums(S.mealDates, S.meals), ""], todayIso));
   put("tblDeposits", table(["Tarikh", ...NAMES], S.depDates.map(d => [d, ...NAMES.map(n => S.deposits[d][n])]),
     ["Total", ...sums(S.depDates, S.deposits).map(fmt)], todayIso));
   put("tblSpending", table(["Tarikh", "Spending", "Details"], S.spending.map(e => [e.date, e.amount, e.details]),
     ["Total spending", fmt(S.spending.reduce((t, e) => t + num(e.amount), 0)), ""], todayIso));
 }
 
+// ---------- Admin: members + permissions ----------
 function renderMembers() {
   const box = $("memberList"); box.textContent = "";
   NAMES.forEach(name => {
     const u = (S.members || []).find(x => x.name === name);
     const row = document.createElement("div"); row.className = "mrow";
     const label = document.createElement("div"); label.className = "mname";
-    label.textContent = name + (u && u.admin ? "· Admin" : "· Member");
-    const input = document.createElement("input"); input.type = "email"; input.placeholder = "Google email";
-    input.value = u ? u.email : "";
+    label.textContent = name + (u && u.admin ? " · Admin" : " · Member");
+    const input = document.createElement("input"); input.type = "email"; input.placeholder = "Google email"; input.value = u ? u.email : "";
     const save = document.createElement("button"); save.textContent = "Save";
     save.onclick = () => act("saveMember", { name, email: input.value });
     row.append(label, input, save);
@@ -196,94 +369,123 @@ function renderMembers() {
       mk.onclick = () => { if (confirm(`Make ${name} the admin? You will become a regular member.`)) act("makeAdmin", { email: u.email }); };
       row.appendChild(mk);
     }
-    if (u && !u.admin) {
-      const perm = document.createElement("div"); perm.className = "perm";
-      const pt = document.createElement("div"); pt.className = "permTitle"; pt.textContent = "Can add funds & meal details for (add only):";
-      const chips = document.createElement("div"); chips.className = "permChips"; const boxes = {};
-      NAMES.forEach(n => {
-        const l = document.createElement("label"); l.className = "chip";
-        const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = (u.addFor || []).includes(n); boxes[n] = cb;
-        l.append(cb, " " + n); chips.appendChild(l);
-      });
-      const sl = document.createElement("label"); sl.className = "chip";
-      const sc = document.createElement("input"); sc.type = "checkbox"; sc.checked = !!u.addSpending;
-      sl.append(sc, " Can add grocery spending (add only)");
-      const sv = document.createElement("button"); sv.textContent = "Save permissions";
-      sv.onclick = () => act("savePerms", { email: u.email, addFor: NAMES.filter(n => boxes[n].checked), addSpending: sc.checked });
-      perm.append(pt, chips, sl, sv); row.appendChild(perm);
-    }
     box.appendChild(row);
   });
 }
+function renderPermissionEditor() {
+  const sel = $("permPerson"), keep = sel.value;
+  sel.textContent = "";
+  const blank = document.createElement("option"); blank.value = ""; blank.textContent = "— Select person —"; sel.appendChild(blank);
+  NAMES.filter(n => n !== me.name && (S.members || []).some(m => m.name === n)).forEach(n => {
+    const o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o);
+  });
+  if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+  syncPermissionEditor();
+}
+function syncPermissionEditor() {
+  const name = $("permPerson").value, u = (S.members || []).find(x => x.name === name);
+  $("permEditor").hidden = !u;
+  if (!u) return;
+  $("permGrocery").checked = !!u.canGrocery; $("permFunds").checked = !!u.canFunds; $("permMeals").checked = !!u.canMeals;
+  const box = $("permWho"); box.textContent = "";
+  NAMES.filter(n => n !== name).forEach(n => {
+    const l = document.createElement("label"); l.className = "chip";
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.value = n; cb.checked = (u.addFor || []).includes(n);
+    l.append(cb, " " + n); box.appendChild(l);
+  });
+}
+$("permPerson").addEventListener("change", () => { permDirty = false; syncPermissionEditor(); });
+$("permEditor").addEventListener("change", () => { permDirty = true; });     // unsaved ticks are never overwritten by the 15 s refresh
+$("savePerms").addEventListener("click", async () => {
+  const name = $("permPerson").value, u = (S.members || []).find(x => x.name === name);
+  if (!u) return;
+  const ok = await act("savePerms", {
+    email: u.email, addFor: [...$("permWho").querySelectorAll("input:checked")].map(x => x.value),
+    canGrocery: $("permGrocery").checked, canFunds: $("permFunds").checked, canMeals: $("permMeals").checked });
+  if (ok) { permDirty = false; syncPermissionEditor(); }
+});
 
-// ---------- Forms (admin only; the script enforces it too) ----------
+// ---------- Forms ----------
 $("spForm").addEventListener("submit", async e => {
   e.preventDefault();
-  await act("addSpending", { date: $("spDate").value, amount: $("spAmt").value, details: $("spDet").value.trim() });
-  $("spAmt").value = ""; $("spDet").value = "";
+  const ok = await act("addSpending", { date: $("spDate").value, amount: $("spAmt").value, details: $("spDet").value.trim() });
+  if (ok) { $("spAmt").value = ""; $("spDet").value = ""; }
 });
 $("depForm").addEventListener("submit", async e => {
   e.preventDefault();
-  await act("addDeposit", { date: $("depDate").value, person: $("who").value, amount: $("depAmt").value });
-  $("depAmt").value = "";
+  const ok = await act("addDeposit", { date: $("depDate").value, person: $("fundWho").value, amount: $("depAmt").value });
+  if (ok) $("depAmt").value = "";
 });
+$("fundWho").addEventListener("change", () => { inlineOpen = false; render(); });
 
-// ---------- Meals: lunch/dinner boxes (sheet cell = number of meals; text kept in the MealDetails tab) ----------
-const noteKey = () => `${$("who").value}|${$("mealDate").value}`;
+// ---------- Meal details: lunch / dinner / বাজারকর্তা ----------
+// Sheet cell = number of meals (a filled box counts 1, or the number typed); the text is kept in the MealDetails tab.
+const noteKey = () => `${$("mealWho").value}|${$("mealDate").value}`;
+const resetMealDirty = () => { mealDirty.lunch = mealDirty.dinner = mealDirty.bazar = false; };
 // full = admin or own meals (auto-save). add = permitted person adding for someone else (fill empty boxes, press Save).
 function mealMode() {
-  const who = $("who").value;
-  if (!me || !S || !who || !S.mealDates.includes($("mealDate").value)) return null;
-  if (me.admin || who === me.name) return "full";
-  if ((me.addFor || []).includes(who)) return "add";
+  const who = $("mealWho").value, date = $("mealDate").value;
+  if (!U || !S || !who || !S.mealDates.includes(date)) return null;
+  if (U.admin || who === U.name) return "full";
+  if (U.canMeals && (U.addFor || []).includes(who)) return "add";
   return null;
 }
 function setEditable() {
-  const mode = mealMode(), who = $("who").value, date = $("mealDate").value;
+  const mode = mealMode(), who = $("mealWho").value, date = $("mealDate").value;
+  if (!S) return;
+  const n = (S.mealNotes || {})[`${who}|${date}`] || { lunch: "", dinner: "" };
+  const exBazar = (S.bazar || {})[date] || "";
   let roL = true, roD = true;
   if (mode === "full") { roL = false; roD = false; }
   else if (mode === "add") {
-    const n = ((S && S.mealNotes) || {})[`${who}|${date}`] || { lunch: "", dinner: "" };
     const cell = S.meals[date] ? S.meals[date][who] : "";
     const locked = cell !== "" && cell != null && cell !== "N/A" && !n.lunch && !n.dinner;
     roL = locked || !!n.lunch; roD = locked || !!n.dinner;
   }
-  $("lunch").readOnly = roL; $("dinner").readOnly = roD;
-  $("mealSave").hidden = !(mode === "add" && (!roL || !roD));
-  $("status").textContent = !who || !S ? "" : !S.mealDates.includes(date) ? "This date is not in the sheet"
+  const bazarOk = !!mode && (U.admin || !exBazar);       // non-admins can only fill it while empty
+  $("lunch").readOnly = roL; $("dinner").readOnly = roD; $("mealBazar").disabled = !bazarOk;
+  $("mealSave").hidden = !(mode === "add" && (!roL || !roD || bazarOk));
+  $("status").textContent = !who ? ""
+    : !S.mealDates.includes(date) ? "This date is not in the sheet"
     : mode === "add" ? "Add-only: fill an empty box and press Save. Saved entries can only be changed by the admin."
     : mode === "full" ? "Tip: a box with 1 (or any text) counts as that many meals in the sheet"
     : "View only — only this person, the admin or a permitted person can add";
 }
 function syncMeal() {
-  if (!$("who").value) return;
+  if (!$("mealWho").value) return;
   const n = (S.mealNotes || {})[noteKey()] || { lunch: "", dinner: "" };
-  if (document.activeElement !== $("lunch")) $("lunch").value = n.lunch;
-  if (document.activeElement !== $("dinner")) $("dinner").value = n.dinner;
+  if (!mealDirty.lunch && document.activeElement !== $("lunch")) $("lunch").value = n.lunch;
+  if (!mealDirty.dinner && document.activeElement !== $("dinner")) $("dinner").value = n.dinner;
+  if (!mealDirty.bazar) {
+    const v = (S.bazar || {})[$("mealDate").value] || "", sel = $("mealBazar");
+    if (v && ![...sel.options].some(o => o.value === v)) { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); }
+    sel.value = v;
+  }
   setEditable();
 }
 async function sendMeal() {
   $("status").textContent = "Saving…";
   try {
-    await api("setMeal", { person: $("who").value, date: $("mealDate").value, lunch: $("lunch").value, dinner: $("dinner").value });
+    await api("setMeal", { person: $("mealWho").value, date: $("mealDate").value, lunch: $("lunch").value, dinner: $("dinner").value, bazar: $("mealBazar").value });
+    resetMealDirty();
     $("status").textContent = "Saved to sheet ✓";
     refresh(true);
   } catch (e) { $("status").textContent = "Save failed: " + e.message; }
 }
-let t;
-function saveMeal() {                       // auto-save (full mode only)
+let saveTimer;
+function autoSaveMeal() {                      // auto-save (full mode only)
   if (mealMode() !== "full") return;
   $("status").textContent = "Saving…";
-  clearTimeout(t);
-  t = setTimeout(sendMeal, 600);
+  clearTimeout(saveTimer); saveTimer = setTimeout(sendMeal, 600);
 }
 $("mealSave").onclick = () => { if (mealMode() === "add") sendMeal(); };
-["lunch", "dinner"].forEach(i => $(i).addEventListener("input", saveMeal));
-$("who").addEventListener("change", () => { $("lunch").value = ""; $("dinner").value = ""; render(); syncMeal(); });
-$("mealDate").addEventListener("change", () => { $("lunch").value = ""; $("dinner").value = ""; syncMeal(); });
+["lunch", "dinner"].forEach(k => $(k).addEventListener("input", () => { mealDirty[k] = true; autoSaveMeal(); }));
+$("mealBazar").addEventListener("change", () => { mealDirty.bazar = true; autoSaveMeal(); });
+const clearMealFields = () => { resetMealDirty(); $("lunch").value = ""; $("dinner").value = ""; $("mealBazar").value = ""; };
+$("mealWho").addEventListener("change", () => { clearMealFields(); render(); syncMeal(); });
+$("mealDate").addEventListener("change", () => { clearMealFields(); syncMeal(); });
 
-
-// ---------- Print / Save as PDF (my data, fund data, bazar data) ----------
+// ---------- Print / Save as PDF ----------
 function rTable(head, rows, foot) {
   const t = document.createElement("table");
   const hr = t.createTHead().insertRow();
@@ -298,38 +500,37 @@ function buildReport(parts) {
   const add = (cls, text) => { const e = document.createElement("div"); e.className = cls; e.textContent = text; R.appendChild(e); };
   const month = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
   add("rp-h1", `খাদ্য তথ্য — ${month}`);
-  add("rp-sub", `Printed ${new Date().toLocaleString("en-GB")} · ${me.name}`);
-  const spentM = monthSpent();
+  add("rp-sub", `Printed ${new Date().toLocaleString("en-GB")} · ${U.name}`);
+  const st = statsFor(S, U.name, U.email);
 
   if (parts.includes("my")) {
-    const m = balanceOf(me.name);
-    add("rp-h2", `My data — ${me.name}`);
+    add("rp-h2", `My data — ${U.name}`);
     R.appendChild(rTable(["Item", "Amount"], [
-      ["My deposit to fund", fmt(m.dep)],
-      [`My share (${fmt(spentM)} ÷ ${NAMES.length})`, fmt(m.share)],
-      [m.bal < 0 ? "My Due" : "My residual", fmt(Math.abs(m.bal))]]));
+      ["My deposit to fund", fmt(st.dep)],
+      [`My fund share (${fmt(st.fundTotal)} ÷ ${NAMES.length})`, fmt(st.fundShare)],
+      [st.balFund < 0 ? "My due in fund" : "My residual in fund", fmt(Math.abs(st.balFund))],
+      [`My spending share (${fmt(st.monthSpent)} ÷ ${NAMES.length})`, fmt(st.spendShare)],
+      [st.balSpend < 0 ? "My due in spending" : "My residual in spending", fmt(Math.abs(st.balSpend))]]));
     add("rp-h3", "My deposits");
-    const mine = S.depDates.filter(d => num(S.deposits[d][me.name]) > 0);
-    if (mine.length) R.appendChild(rTable(["Date", "Amount"], mine.map(d => [d, fmt(num(S.deposits[d][me.name]))]), ["Total", fmt(m.dep)]));
+    const mine = S.depDates.filter(d => num(S.deposits[d][U.name]) > 0);
+    if (mine.length) R.appendChild(rTable(["Date", "Amount"], mine.map(d => [d, fmt(num(S.deposits[d][U.name]))]), ["Total", fmt(st.dep)]));
     else add("rp-note", "No deposits yet");
   }
-
   if (parts.includes("fund")) {
-    const fund = S.depDates.reduce((t, d) => t + NAMES.reduce((u, n) => u + num(S.deposits[d][n]), 0), 0);
     const out = S.spending.filter(e => e.date <= todayIso).reduce((t, e) => t + num(e.amount), 0);
     add("rp-h2", "Fund data");
-    R.appendChild(rTable(["Item", "Amount"], [["Total fund", fmt(fund)], ["Total spending", fmt(out)], ["Money left in the fund", fmt(fund - out)]]));
-    add("rp-h3", `Everyone (equal share ${fmt(spentM / NAMES.length)})`);
-    const rows = NAMES.map(n => { const b = balanceOf(n); return [n, fmt(b.dep), fmt(b.share), b.bal >= 0 ? fmt(b.bal) : "", b.bal < 0 ? fmt(-b.bal) : ""]; });
-    R.appendChild(rTable(["Name", "Deposit", "Share", "Residual", "Due"], rows));
+    R.appendChild(rTable(["Item", "Amount"], [["Total fund", fmt(st.fundTotal)], ["Total spending", fmt(out)], ["Money left in the fund", fmt(st.fundTotal - out)]]));
+    add("rp-h3", `Everyone (spending share ${fmt(st.spendShare)}, fund share ${fmt(st.fundShare)})`);
+    const rows = NAMES.map(n => { const s = statsFor(S, n);
+      return [n, fmt(s.dep), s.balFund >= 0 ? fmt(s.balFund) : "", s.balFund < 0 ? fmt(-s.balFund) : "", s.balSpend >= 0 ? fmt(s.balSpend) : "", s.balSpend < 0 ? fmt(-s.balSpend) : ""]; });
+    R.appendChild(rTable(["Name", "Deposit", "Residual in fund", "Due in fund", "Residual in spending", "Due in spending"], rows));
   }
-
   if (parts.includes("bazar")) {
     const sp = S.spending.filter(e => num(e.amount) > 0).sort((x, y) => x.date.localeCompare(y.date));
     add("rp-h2", "Bazar data");
-    if (sp.length) R.appendChild(rTable(["Date", "Amount", "Details"],
-      sp.map(e => [e.date, fmt(num(e.amount)), e.details === "N/A" ? "" : e.details]),
-      ["Total", fmt(sp.reduce((t, e) => t + num(e.amount), 0)), ""]));
+    if (sp.length) R.appendChild(rTable(["Date", "Amount", "Details", "বাজারকর্তা"],
+      sp.map(e => [e.date, fmt(num(e.amount)), e.details === "N/A" ? "" : e.details, (S.bazar || {})[e.date] || ""]),
+      ["Total", fmt(sp.reduce((t, e) => t + num(e.amount), 0)), "", ""]));
     else add("rp-note", "No bazar entries yet");
   }
 }
@@ -345,15 +546,14 @@ document.querySelectorAll("[data-p]").forEach(b => {
   b.onclick = () => printReport(b.dataset.p === "all" ? ["my", "fund", "bazar"] : [b.dataset.p]);
 });
 
-
-// ---------- Alerts for the admin (entries made by permitted people) ----------
+// ---------- Admin alerts (entries made or edited by permitted people) ----------
 function alertLine(x) {
   const d = document.createElement("div"); d.className = "alertLine";
-  const when = new Date(x.time); const ts = isNaN(when) ? "" : when.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const when = new Date(x.time), ts = isNaN(when) ? "" : when.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   d.textContent = `${ts} · ${x.by}: ${x.detail}`; return d;
 }
 function renderAlerts() {
-  const list = (S && S.alerts) || [];
+  const list = (U && U.admin && S && S.alerts) || [];      // never shown while previewing a member
   const bar = $("alertBar"); bar.textContent = ""; bar.hidden = !list.length;
   if (list.length) {
     const head = document.createElement("div"); head.className = "alertHead";
