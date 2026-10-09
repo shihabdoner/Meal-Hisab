@@ -31,6 +31,8 @@
   <div id="app" hidden>
     <div class="topbar"><div><span id="me"></span><div class="month" id="monthLabel"></div></div><span><button id="refresh" title="Reload from sheet">⟳</button> <button id="out">Sign out</button></span></div>
 
+    <div id="alertBar" class="alertBar" hidden></div>
+
     <div class="grid mine">
       <div class="card"><div class="k">My deposit to fund</div><div class="v" id="myDep">৳0</div></div>
       <div class="card" id="resCard"><div class="k">My residual</div><div class="v" id="myRes">৳0</div><div class="muted small" id="resNote"></div></div>
@@ -55,8 +57,8 @@
       </div>
     </details>
 
-    <details class="card adminOnly" style="margin-top:10px" hidden>
-      <summary>+ Add grocery spending (admin)</summary>
+    <details class="card" id="spendAddBox" style="margin-top:10px" hidden>
+      <summary>+ Add grocery spending</summary>
       <form id="spForm" class="form">
         <input id="spAmt" type="number" min="0" step="any" placeholder="Amount" required>
         <input id="spDate" type="date" required>
@@ -65,7 +67,8 @@
       </form>
     </details>
     <details class="card" style="margin-top:10px">
-      <summary>Grocery spending history</summary>
+      <summary>Grocery spending history <span class="alertDot" data-alert="spending" hidden></span></summary>
+      <div class="secAlert" data-alert="spending" hidden></div>
       <div id="spList"></div>
     </details>
 
@@ -80,10 +83,10 @@
       <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
       <div style="margin-top:10px"><b>জমাদানের তথ্য</b></div>
       <div id="deps" class="muted"></div>
-      <form id="depForm" class="form adminOnly" hidden>
+      <form id="depForm" class="form" hidden>
         <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" required>
         <input id="depDate" type="date" required>
-        <button>+ Add deposit (admin)</button>
+        <button>+ Add deposit</button>
       </form>
 
       <h2 class="flick">Meal details</h2>
@@ -97,13 +100,14 @@
           </tr>
         </table>
       </div>
+      <button id="mealSave" style="margin-top:8px" hidden>Save (add only)</button>
       <div class="status" id="status"></div>
     </section>
 
     <h2 class="flick">Sheet view</h2>
-    <details class="card sheet"><summary>Meals (per day)</summary><div id="tblMeals" class="tablewrap"></div></details>
-    <details class="card sheet"><summary>Grocery spending</summary><div id="tblSpending" class="tablewrap"></div></details>
-    <details class="card sheet"><summary>Deposits</summary><div id="tblDeposits" class="tablewrap"></div></details>
+    <details class="card sheet"><summary>Meals (per day) <span class="alertDot" data-alert="meal" hidden></span></summary><div class="secAlert" data-alert="meal" hidden></div><div id="tblMeals" class="tablewrap"></div></details>
+    <details class="card sheet"><summary>Grocery spending <span class="alertDot" data-alert="spending" hidden></span></summary><div class="secAlert" data-alert="spending" hidden></div><div id="tblSpending" class="tablewrap"></div></details>
+    <details class="card sheet"><summary>Deposits <span class="alertDot" data-alert="deposit" hidden></span></summary><div class="secAlert" data-alert="deposit" hidden></div><div id="tblDeposits" class="tablewrap"></div></details>
 
     <h2 class="flick adminOnly" hidden>Group admin</h2>
     <section class="card adminOnly" id="adminPanel" hidden>
