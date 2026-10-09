@@ -11,6 +11,7 @@ const todayIso = iso(new Date());
 const num = x => { const n = Number(x); return (x === "" || x == null || isNaN(n)) ? 0 : n; };
 const lab = d => new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
+$("monthLabel").textContent = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
 $("today").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 ["spDate", "depDate", "mealDate"].forEach(i => $(i).value = todayIso);
 
@@ -91,28 +92,23 @@ function relDate(d) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
 }
 
-// Personal numbers for the signed-in person.
-// meal rate = total spending to date / total meals to date; residual = deposits to date - my meals x rate;
-// advance = deposits dated after today.
-function myStats() {
-  const name = me.name, upto = d => d <= todayIso;
-  const mealsOf = n => S.mealDates.filter(upto).reduce((t, d) => t + num(S.meals[d][n]), 0);
-  const totalMeals = NAMES.reduce((t, n) => t + mealsOf(n), 0);
-  const spent = S.spending.filter(e => upto(e.date)).reduce((t, e) => t + num(e.amount), 0);
-  const rate = totalMeals > 0 ? spent / totalMeals : 0;
-  const dep = S.depDates.reduce((t, d) => t + num(S.deposits[d][name]), 0);
-  const advance = S.depDates.filter(d => !upto(d)).reduce((t, d) => t + num(S.deposits[d][name]), 0);
-  const meals = mealsOf(name);
-  return { dep, advance, meals, rate, totalMeals, residual: (dep - advance) - meals * rate };
+// Equal split: this month's total spending / number of people. Balance = my deposit - my share.
+// Positive balance = residual, negative = due.
+const monthKey = todayIso.slice(0, 7);
+const monthSpent = () => S.spending.filter(e => e.date.slice(0, 7) === monthKey).reduce((t, e) => t + num(e.amount), 0);
+function balanceOf(n) {
+  const share = monthSpent() / NAMES.length;
+  const dep = S.depDates.reduce((t, d) => t + num(S.deposits[d][n]), 0);
+  return { dep, share, bal: Math.round((dep - share) * 100) / 100 };
 }
 
 function render() {
-  const st = myStats();
-  $("myDep").textContent = fmt(st.dep);
-  $("myAdv").textContent = fmt(st.advance);
-  $("myRes").textContent = fmt(st.residual);
-  $("resCard").classList.toggle("neg", st.residual < 0);
-  $("resNote").textContent = st.totalMeals > 0 ? `${st.meals} meals × ${fmt(st.rate)}` : "No meals recorded yet";
+  const m = balanceOf(me.name);
+  $("myDep").textContent = fmt(m.dep);
+  $("myRes").textContent = fmt(Math.max(m.bal, 0));
+  $("myDue").textContent = fmt(Math.max(-m.bal, 0));
+  $("dueCard").classList.toggle("neg", m.bal < 0);
+  $("resNote").textContent = `Share ${fmt(m.share)} (${fmt(monthSpent())} ÷ ${NAMES.length})`;
   const lastBazar = [...S.spending].filter(e => e.date <= todayIso && num(e.amount) > 0).sort((x, y) => x.date.localeCompare(y.date)).pop();
   $("lastDate").textContent = relDate(lastBazar && lastBazar.date);
 
@@ -247,3 +243,66 @@ function saveMeal() {
 ["lunch", "dinner"].forEach(i => $(i).addEventListener("input", saveMeal));
 $("who").addEventListener("change", () => { $("lunch").value = ""; $("dinner").value = ""; render(); syncMeal(); });
 $("mealDate").addEventListener("change", () => { $("lunch").value = ""; $("dinner").value = ""; syncMeal(); });
+
+
+// ---------- Print / Save as PDF (my data, fund data, bazar data) ----------
+function rTable(head, rows, foot) {
+  const t = document.createElement("table");
+  const hr = t.createTHead().insertRow();
+  head.forEach(h => { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); });
+  const tb = t.createTBody();
+  rows.forEach(r => { const tr = tb.insertRow(); r.forEach(c => { tr.insertCell().textContent = c; }); });
+  if (foot) { const tr = tb.insertRow(); tr.className = "rp-total"; foot.forEach(c => { tr.insertCell().textContent = c; }); }
+  return t;
+}
+function buildReport(parts) {
+  const R = $("report"); R.textContent = "";
+  const add = (cls, text) => { const e = document.createElement("div"); e.className = cls; e.textContent = text; R.appendChild(e); };
+  const month = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  add("rp-h1", `খাদ্য তথ্য — ${month}`);
+  add("rp-sub", `Printed ${new Date().toLocaleString("en-GB")} · ${me.name}`);
+  const spentM = monthSpent();
+
+  if (parts.includes("my")) {
+    const m = balanceOf(me.name);
+    add("rp-h2", `My data — ${me.name}`);
+    R.appendChild(rTable(["Item", "Amount"], [
+      ["My deposit to fund", fmt(m.dep)],
+      [`My share (${fmt(spentM)} ÷ ${NAMES.length})`, fmt(m.share)],
+      [m.bal < 0 ? "My Due" : "My residual", fmt(Math.abs(m.bal))]]));
+    add("rp-h3", "My deposits");
+    const mine = S.depDates.filter(d => num(S.deposits[d][me.name]) > 0);
+    if (mine.length) R.appendChild(rTable(["Date", "Amount"], mine.map(d => [d, fmt(num(S.deposits[d][me.name]))]), ["Total", fmt(m.dep)]));
+    else add("rp-note", "No deposits yet");
+  }
+
+  if (parts.includes("fund")) {
+    const fund = S.depDates.reduce((t, d) => t + NAMES.reduce((u, n) => u + num(S.deposits[d][n]), 0), 0);
+    const out = S.spending.filter(e => e.date <= todayIso).reduce((t, e) => t + num(e.amount), 0);
+    add("rp-h2", "Fund data");
+    R.appendChild(rTable(["Item", "Amount"], [["Total fund", fmt(fund)], ["Total spending", fmt(out)], ["Money left in the fund", fmt(fund - out)]]));
+    add("rp-h3", `Everyone (equal share ${fmt(spentM / NAMES.length)})`);
+    const rows = NAMES.map(n => { const b = balanceOf(n); return [n, fmt(b.dep), fmt(b.share), b.bal >= 0 ? fmt(b.bal) : "", b.bal < 0 ? fmt(-b.bal) : ""]; });
+    R.appendChild(rTable(["Name", "Deposit", "Share", "Residual", "Due"], rows));
+  }
+
+  if (parts.includes("bazar")) {
+    const sp = S.spending.filter(e => num(e.amount) > 0).sort((x, y) => x.date.localeCompare(y.date));
+    add("rp-h2", "Bazar data");
+    if (sp.length) R.appendChild(rTable(["Date", "Amount", "Details"],
+      sp.map(e => [e.date, fmt(num(e.amount)), e.details === "N/A" ? "" : e.details]),
+      ["Total", fmt(sp.reduce((t, e) => t + num(e.amount), 0)), ""]));
+    else add("rp-note", "No bazar entries yet");
+  }
+}
+function printReport(parts) {
+  if (!S || !me) return;
+  buildReport(parts);
+  const old = document.title;
+  document.title = `khaddo-${monthKey}-${parts.join("-")}`;
+  window.addEventListener("afterprint", () => { document.title = old; }, { once: true });
+  window.print();
+}
+document.querySelectorAll("[data-p]").forEach(b => {
+  b.onclick = () => printReport(b.dataset.p === "all" ? ["my", "fund", "bazar"] : [b.dataset.p]);
+});
