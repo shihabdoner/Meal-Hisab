@@ -141,3 +141,57 @@ textarea[readonly]{opacity:.75;cursor:not-allowed}
 .permChips{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:6px}
 .chip{display:inline-flex;align-items:center;gap:4px;font-size:.9rem;color:#fff;margin-bottom:6px}
 .chip input{width:auto;padding:0;margin:0}
+
+/* ---- Interface updates ---- */
+.topbar{flex-wrap:wrap}
+.topIdentity{min-width:130px}
+.adminPreview{width:auto;max-width:190px;margin:0;flex:1;min-width:125px}
+.lastDateCard{grid-column:1/-1}
+.lastDateCard .v{font-size:1.1rem}
+.detailSection{margin-bottom:12px}
+.detailSection label,.permissionBox>label,.mealEditor>label{display:block;color:#9a9a9a;font-size:.85rem;margin:8px 0 4px}
+.historyList{display:grid;gap:5px;margin:8px 0 12px}
+.mealEditor{margin-top:10px;padding-top:6px;border-top:1px dashed #2b6b2b}
+
+/* date highlight (grocery details, histories) */
+.sp-date,.row b.sp-date{display:inline-block;color:#000;background:greenyellow;border:1px solid #09ff00;border-radius:4px;padding:1px 6px;margin-right:3px;text-shadow:none;font-weight:700}
+.lastd{margin-top:4px;white-space:pre-line;overflow-wrap:anywhere}
+
+/* rows with edit / delete */
+.spendingRow{align-items:flex-start}
+.spendingDescription{white-space:pre-line;overflow-wrap:anywhere;flex:1}
+.rowRight{display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.rowActions{display:inline-flex;align-items:center;gap:4px}
+.editBtn{padding:4px 8px;font-size:.78rem;border-radius:4px}
+.row.editing{display:block}
+.inlineEdit{display:grid;gap:8px;width:100%}
+.inlineTitle{font-size:.85rem;color:greenyellow}
+.inlineBtns{display:flex;gap:8px}
+.inlineEdit textarea{min-height:110px}
+.mealHistoryRow{align-items:flex-start}
+
+/* cards */
+#dueFundCard.neg .v{color:#ff0000}
+#dueFundCard.neg{border-color:#ff0000}
+
+/* preview mode = look only */
+#app.previewing .form,#app.previewing .editBtn,#app.previewing .x,#app.previewing .mealEditor,#app.previewing .secAlert button{pointer-events:none;opacity:.55}
+
+/* permissions box */
+.permissionBox{margin-top:16px;padding:12px;border:2px dashed #2b6b2b;border-radius:6px}
+.permissionBox h3{margin:0 0 10px;color:greenyellow;font-family:"Exo 2",sans-serif}
+.permGroup{margin:10px 0;padding:10px;background:#111;border:1px solid #2b6b2b;border-radius:5px}
+.permGroup>b{display:block;margin-bottom:8px;color:#05f072;font-family:"Exo 2",sans-serif}
+.permGroup>.chip{display:flex;width:100%;margin:8px 0}
+.permGroup .chip input{flex:0 0 auto}
+.permChips{display:flex;flex-wrap:wrap;gap:6px 14px}
+.permChips .chip{display:inline-flex;width:auto}
+
+@media(max-width:440px){
+  .topbar{align-items:flex-start}
+  .adminPreview{order:3;flex-basis:100%;max-width:none}
+  .spendingRow{gap:6px;flex-wrap:wrap}
+  .spendingRow .rowRight{width:100%;justify-content:space-between}
+  .row{padding:5px}
+  .detailSection{padding:10px}
+}
