@@ -48,20 +48,20 @@
     </div>
 
     <div class="grid mine">
-      <div class="card wide"><div class="k">My deposit to fund</div><div class="v" id="myDep">৳0</div></div>
+      <div class="card wide" id="myDepCard"><div class="k">My deposit to fund</div><div class="v" id="myDep">৳0</div></div>
       <div class="card" id="resFundCard"><div class="k">My residual in fund</div><div class="v" id="myResFund">৳0</div><div class="muted small" id="resFundNote"></div></div>
       <div class="card" id="resCard"><div class="k">My residual in spending</div><div class="v" id="myRes">৳0</div><div class="muted small" id="resNote"></div></div>
       <div class="card" id="dueFundCard"><div class="k">My due in fund</div><div class="v" id="myDueFund">৳0</div></div>
       <div class="card" id="dueCard"><div class="k">My due in spending</div><div class="v" id="myDue">৳0</div></div>
-      <div class="card"><div class="k">Most recent added fund</div><div class="v" id="lastFund">N/A</div><div class="muted small" id="lastFundMeta"></div></div>
-      <div class="card"><div class="k">Most recent added fund by me</div><div class="v" id="lastFundMine">N/A</div><div class="muted small" id="lastFundMineMeta"></div></div>
-      <div class="card wide lastDateCard"><div class="k">সর্বশেষ বাজারের তারিখ</div><div class="v" id="lastDate">N/A</div></div>
+      <div class="card" id="lastFundCard"><div class="k">Most recent added fund</div><div class="v" id="lastFund">N/A</div><div class="muted small" id="lastFundMeta"></div></div>
+      <div class="card" id="lastFundMineCard"><div class="k">Most recent added fund by me</div><div class="v" id="lastFundMine">N/A</div><div class="muted small" id="lastFundMineMeta"></div></div>
+      <div class="card wide lastDateCard" id="lastDateCard"><div class="k">সর্বশেষ বাজারের তারিখ</div><div class="v" id="lastDate">N/A</div></div>
     </div>
 
     <div class="grid" style="margin-top:10px">
-      <div class="card wide"><div class="k">Last grocery spending</div><div class="v" id="last">N/A</div><div class="muted lastd" id="lastd"></div></div>
-      <div class="card"><div class="k">Total fund</div><div class="v" id="fund">৳0</div></div>
-      <div class="card"><div class="k">Total spending</div><div class="v" id="spent">৳0</div></div>
+      <div class="card wide" id="lastGroceryCard"><div class="k">Last grocery spending</div><div class="v" id="last">N/A</div><div class="muted lastd" id="lastd"></div></div>
+      <div class="card" id="fundCard"><div class="k">Total fund</div><div class="v" id="fund">৳0</div></div>
+      <div class="card" id="spentCard"><div class="k">Total spending</div><div class="v" id="spent">৳0</div></div>
       <div class="card wide left" id="leftcard"><div class="k">Money left in the fund until today</div><div class="v" id="left">৳0</div></div>
     </div>
 
@@ -136,10 +136,10 @@
 
     </div>
 
-    <h2 class="flick">Sheet view</h2>
-    <details class="card sheet"><summary>Meals (per day) <span class="alertDot" data-alert="meal" hidden></span></summary><div class="secAlert" data-alert="meal" hidden></div><div id="tblMeals" class="tablewrap"></div></details>
-    <details class="card sheet"><summary>Grocery spending <span class="alertDot" data-alert="spending" hidden></span></summary><div class="secAlert" data-alert="spending" hidden></div><div id="tblSpending" class="tablewrap"></div></details>
-    <details class="card sheet"><summary>Deposits <span class="alertDot" data-alert="deposit" hidden></span></summary><div class="secAlert" data-alert="deposit" hidden></div><div id="tblDeposits" class="tablewrap"></div></details>
+    <h2 class="flick" id="sheetHead">Sheet view</h2>
+    <details class="card sheet" id="sheetMeals"><summary>Meals (per day) <span class="alertDot" data-alert="meal" hidden></span></summary><div class="secAlert" data-alert="meal" hidden></div><div id="tblMeals" class="tablewrap"></div></details>
+    <details class="card sheet" id="sheetSpending"><summary>Grocery spending <span class="alertDot" data-alert="spending" hidden></span></summary><div class="secAlert" data-alert="spending" hidden></div><div id="tblSpending" class="tablewrap"></div></details>
+    <details class="card sheet" id="sheetDeposits"><summary>Deposits <span class="alertDot" data-alert="deposit" hidden></span></summary><div class="secAlert" data-alert="deposit" hidden></div><div id="tblDeposits" class="tablewrap"></div></details>
 
     <h2 class="flick adminOnly" hidden>Group admin</h2>
     <section class="card adminOnly" id="adminPanel" hidden>
@@ -161,6 +161,14 @@
           </div>
           <div class="permGroup"><b>Grocery details</b>
             <label class="chip"><input type="checkbox" id="permGrocery"> Can add grocery spending (and edit the latest entry they added)</label>
+          </div>
+          <div class="permGroup"><b>Sheet view</b>
+            <div class="muted small">Which sheet tables this member can see.</div>
+            <div id="permViewSheets" class="permChips"></div>
+          </div>
+          <div class="permGroup"><b>Dashboard cards</b>
+            <div class="muted small">Unticked cards disappear from this member's screen.</div>
+            <div id="permViewCards" class="permChips"></div>
           </div>
           <button id="savePerms">Save permissions</button>
         </div>
