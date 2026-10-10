@@ -318,3 +318,5 @@ main{padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env
 
 /* ---- Hidden-card layout: a lone card fills the row on phones ---- */
 @media(max-width:899px){.grid>.card.fill{grid-column:1/-1}}
+/* the sheet dropdown exists only in the admin's own view */
+body:not(.isAdmin) #bookBar{display:none!important}
