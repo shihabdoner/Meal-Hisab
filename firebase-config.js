@@ -11,6 +11,6 @@ export const firebaseConfig = {
 // Every spreadsheet has its own Apps Script "Web app" URL (ends with /exec).
 // The site shows a "Sheet" switcher when more than one URL is filled in.
 export const BOOKS = [
-  { id: "khaddo", label: "খাদ্য তথ্য",   url: "https://script.google.com/macros/s/AKfycbyY2nV0nOj5WkCIdzhoQBgeQv240v8BL1cQKop6dqOlh8qIamh7iGIqK0n3d1K4zyik5Q/exec" },
+  { id: "khaddo", label: "খাদ্য তথ্য",   url: "https://script.google.com/macros/s/AKfycbz5YhnlSH6qsayE1V97ptZ1d2OrYFGfqrVdaBjs4rgKEjB3mALySM3ekTIzWGIthiVUdA/exec" },
   { id: "bazar",  label: "বেলা হিসাব", url: "https://script.google.com/macros/s/AKfycbzAoKyY1RCXVSMuhgV_z5hPcKXQ_LghwiVdmIqXbSLS7jrrndGgcBHt8ZVRClWW-AssEQ/exec" }
 ];
