@@ -16,7 +16,7 @@ const VIEW_KEYS = ['sheetMeals','sheetSpending','sheetDeposits','myDep','resid',
 // In the "বেলা হিসাব" (Bazar hisab) script this is the খাদ্য তথ্য web app URL. In the খাদ্য তথ্য script it stays ''.
 const SOURCE_URL = 'https://script.google.com/macros/s/AKfycbz5YhnlSH6qsayE1V97ptZ1d2OrYFGfqrVdaBjs4rgKEjB3mALySM3ekTIzWGIthiVUdA/exec';
 // Password the two scripts use to talk to each other without a signed-in user (must be IDENTICAL in both scripts).
-const SYNC_SECRET = 'Df1hJC8NJnIE7Bwm7cIGfY4iJmUh6RQN';
+const SYNC_SECRET = '2ac67b4c02f40b45762adb946a9a0235e308b11fc48f1492';
 
 // TEMPORARY RULE (Bazar hisab only, October 2026): when copying from khaddo, show 'N/A' as BLANK for these dates.
 const BLANK_NA_FROM = '2026-10-01';
@@ -123,6 +123,21 @@ function normTime_(x) {
   if (h > 23 || mi > 59) return '';
   return p2_(h) + ':' + p2_(mi);
 }
+function parseLine_(s) {
+  const names = NAMES.map(function (n) {
+    return n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }).join('|');
+  const m = String(s || '').match(new RegExp(
+    '^\\s*(?:\\[(\\d{1,2}:\\d{2})\\]\\s*)?(' + names + ')\\b\\s*:?\\s*([\\s\\S]*)$', 'i'
+  ));
+  const person = m ? NAMES.find(function (n) { return n.toLowerCase() === m[2].toLowerCase(); }) : '';
+  return m ? {
+    time: normTime_(m[1] || ''),
+    person: person || m[2],
+    details: m[3].trim()
+  } : { time: '', person: '', details: String(s || '').trim() };
+}
+
 // No entries for a date/time that has not happened yet. The phone's clock is trusted when it is within a day of the sheet's clock (time zones).
 function checkNotFuture_(date, time, req) {
   const srv = nowParts_();
@@ -293,7 +308,7 @@ function metaRow_(sheet, keys) {
   for (let i = 1; i < d.length; i++) {
     const got = keys.map(function (_, j) { return j === 0 ? (dateKey_(d[i][0]) || String(d[i][0])) : String(d[i][j] || ''); });
     if (keys.every(function (k, j) { return got[j] === String(k); })) return i + 1;
-  }
+      }
   return 0;
 }
 function saveDepositMeta_(date, person, me) {
@@ -363,7 +378,7 @@ function migrateOnce_() {
   const P = PropertiesService.getScriptProperties();
   if (P.getProperty('GL_MIGRATED') === '1') return;
   const lock = LockService.getScriptLock(), had = lock.hasLock();
-  if (!had) lock.waitLock(20000);                    // only one request may run the one-time migration
+  if (!had) lock.waitLock(20000);
   try {
     if (P.getProperty('GL_MIGRATED') === '1') return;
     const gl = glTab_(); dlTab_();
@@ -385,7 +400,8 @@ function migrateOnce_() {
           const a = num_(cellOf_(L, o.r, L.spend.amountCol));
           if (a > 0) {
             const ex = notes['*BAZAR*|' + o.k], m = sm[o.k];
-            entries.push({ id: newId_(), date: o.k, time: '', person: ex ? normBazar_(ex.lunch) : '', amount: a, details: cleanDet_(cellOf_(L, o.r, L.spend.detailsCol)),
+            const line = parseLine_(cleanDet_(cellOf_(L, o.r, L.spend.detailsCol)));
+            entries.push({ id: newId_(), date: o.k, time: line.time, person: line.person || (ex ? normBazar_(ex.lunch) : ''), amount: a, details: line.details,
               email: m ? String(m[1] || '') : '', name: m ? String(m[2] || '') : '' });
           }
         });
@@ -408,7 +424,7 @@ function rebuildLogFromSheet() {
 }
 
 // ---------- Drawing the grocery log into the sheet ----------
-function groups_(L) {                       // rows of the spending table grouped by date (consecutive rows with the same date)
+function groups_(L) {
   const out = [];
   L.spend.rows.forEach(function (o) {
     const g = out[out.length - 1];
@@ -449,7 +465,6 @@ function writeRow_(L, r, sp) {
     const d = sh.getRange(r + 1, L.spend.detailsCol + 1); d.setValue(sp.d || ''); d.setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
   }
 }
-// make the date group have exactly want.length rows (insert / delete extra rows under the date), then write them
 function applyRows_(L, g, want) {
   const sh = L.sh, r0 = g.rows[0], cur = g.rows.length, need = want.length;
   let rows = g.rows.slice();
@@ -458,10 +473,10 @@ function applyRows_(L, g, want) {
     sh.insertRowsAfter(last + 1, add);
     for (let i = 1; i <= add; i++) {
       const nr = last + i;
-      if (L.kind === 'blocks') {                       // format only (do not repeat the meal / deposit numbers), then the date
+      if (L.kind === 'blocks') {
         sh.getRange(r0 + 1, 1, 1, maxC).copyTo(sh.getRange(nr + 1, 1, 1, maxC), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
         sh.getRange(nr + 1, L.dateCol + 1).setValue(sh.getRange(r0 + 1, L.dateCol + 1).getValue());
-      } else {                                         // copy the whole row so merged amount / details cells come along
+      } else {
         sh.getRange(r0 + 1, 1, 1, maxC).copyTo(sh.getRange(nr + 1, 1, 1, maxC));
       }
       rows.push(nr);
@@ -472,12 +487,11 @@ function applyRows_(L, g, want) {
   }
   rows.forEach(function (r, i) { writeRow_(L, r, want[i]); });
 }
-// Draw the log into the sheet. Only dates whose rows differ are touched. onlyDates = array of dates, or null for all.
 function renderGrocery_(log, onlyDates) {
   const L = layout_(), notes = L.kind === 'blocks' ? L.sh.getDataRange().getNotes() : null;
   const by = {}, only = onlyDates ? onlyDates.reduce(function (m, d) { m[d] = 1; return m; }, {}) : null;
   sortEntries_(log).forEach(function (e) {
-    if (L.kind === 'blocks' && NAMES.indexOf(e.person) < 0) return;     // cannot be placed without a বাজারকর্তা column (it stays safe in the log)
+    if (L.kind === 'blocks' && NAMES.indexOf(e.person) < 0) return;
     (by[e.date] = by[e.date] || []).push(e);
   });
   const jobs = [];
@@ -489,7 +503,7 @@ function renderGrocery_(log, onlyDates) {
     if (JSON.stringify(want) !== JSON.stringify(have)) jobs.push({ g: g, want: want });
   });
   if (!jobs.length) return 0;
-  jobs.sort(function (a, b) { return b.g.rows[0] - a.g.rows[0]; });          // bottom first, so row numbers above stay valid
+  jobs.sort(function (a, b) { return b.g.rows[0] - a.g.rows[0]; });
   jobs.forEach(function (j) { applyRows_(L, j.g, j.want); });
   SpreadsheetApp.flush();
   applyTotals_(true);
@@ -502,7 +516,6 @@ function totalRow_(L, run) {
   for (let r = end + 1; r < Math.min(L.v.length, end + 8); r++) if (/^total/i.test(String((L.v[r] || [])[L.dateCol] || '').trim())) return r;
   return -1;
 }
-// overwrite=false: fill empty total cells. overwrite=true: only re-point existing =SUM(...) cells at the (possibly longer) date table.
 function applyTotals_(overwrite) {
   const L = layout_(), sh = L.sh;
   const put = function (row, col, first, last) {
@@ -526,7 +539,7 @@ function applyTotals_(overwrite) {
 // ---------- Actions ----------
 function handle_(req) {
   let me;
-  if (req.secret) {                      // the other sheet talking to this one (no signed-in user)
+  if (req.secret) {
     if (!SYNC_SECRET || req.secret !== SYNC_SECRET) throw new Error('Bad sync secret');
     if (['load', 'importBazar'].indexOf(req.action) < 0) throw new Error('Not allowed');
     me = { email: '', name: SHEET_USER, admin: false, addFor: [], fundsFor: [], mealsFor: [], views: VIEW_KEYS.slice(),
@@ -541,7 +554,6 @@ function handle_(req) {
     switch (req.action) {
       case 'setMeal': setMeal_(me, req); break;
       case 'addDeposit':
-        // admin, or a person the admin allowed to add funds for this member (add only)
         if (!(me.admin || me.fundsFor.indexOf(req.person) >= 0))
           throw new Error('You are not allowed to add funds for ' + req.person);
         addDeposit_(me, req);
@@ -563,8 +575,6 @@ function handle_(req) {
       case 'savePerms': admin_(me); savePerms_(req); break;
       case 'ackAlerts': admin_(me); ack_(req); break;
       case 'importBazar': info = importBazar_(req); break;
-      // the app calls this on the other sheet after every change. Any group member may trigger it
-      // (it only copies data FROM the source sheet), otherwise members' saves would fail to sync.
       case 'syncFromSource': info = syncFromSource_(me, req.idToken); break;
       default: throw new Error('Unknown action');
     }
@@ -592,17 +602,16 @@ function load_(me) {
   out.spending = sortEntries_(readLog_().filter(function (e) { return sheetDates[e.date]; })).map(function (e) {
     return { id: e.id, date: e.date, time: e.time, amount: e.amount, details: e.details, bazarKorta: e.person, addedByEmail: e.email, addedByName: e.name };
   });
-  if (L.kind === 'blocks') {              // the rows of the bazar block exactly as they are in the sheet (for the Sheet view)
+  if (L.kind === 'blocks') {
     out.bazarRows = L.spend.rows.map(function (o) {
       const cells = {}; NAMES.forEach(function (n) { const c = L.spend.cols[n]; cells[n] = c === undefined ? '' : cell(o.r, c); });
       return { date: o.k, time: normTime_(cell(o.r, L.dateCol + 1)), cells: cells };
     });
   }
 
-  // deposits: each deposit, plus (if the sheet cell holds more / less than the entries add up to) one "sheet entry" for the difference
   const depSet = {}, sums = {};
   out.depDates.forEach(function (d) { depSet[d] = 1; });
-  readDepositLog_().forEach(function (e) {
+    readDepositLog_().forEach(function (e) {
     if (!depSet[e.date]) return;
     out.depositLog.push({ id: e.id, date: e.date, time: e.time, person: e.person, amount: e.amount, addedByEmail: e.email, addedByName: e.name, pseudo: false });
     sums[e.date + '|' + e.person] = r2_((sums[e.date + '|' + e.person] || 0) + e.amount);
@@ -713,7 +722,7 @@ function clearDeposit_(q) {
     setDepCell_(c, cur - e.amount);
     writeDepositLog_(dl.filter(function (x) { return x !== e; }));
   }
-  if (!id || mine.length <= 1) {                     // nothing left for this person on this date: forget who added it
+  if (!id || mine.length <= 1) {
     const s = depositMeta_(), r = metaRow_(s, [q.date, q.person]);
     if (r && num_(c.range.getValue()) <= 0) s.getRange(r, 1, 1, 4).setValues([['', '', '', '']]);
   }
@@ -729,13 +738,13 @@ function cleanItem_(it, date, q) {
   checkNotFuture_(date, time, q);
   return { person: person, amount: amount, time: time, details: String(it.details || '').trim().slice(0, 3000) };
 }
-// q.items = [{ bazarKorta, time, amount, details }, ...]  all on q.date. Every item becomes its own row under that date in the sheet.
+// q.items = [{ bazarKorta, time, amount, details }, ...] all on q.date. Every item becomes its own row under that date in the sheet.
 function addSpending_(me, q) {
   const date = String(q.date || '');
   const items = Array.isArray(q.items) && q.items.length ? q.items : [{ bazarKorta: q.bazarKorta, time: q.time || nowParts_().time, amount: q.amount, details: q.details }];
   const L = layout_();
   if (!L.spend.rows.some(function (o) { return o.k === date; })) throw new Error('That date is not in the sheet');
-  const fresh = items.map(function (it) { return cleanItem_(it, date, q); });      // validate everything first: nothing is saved if one is wrong
+  const fresh = items.map(function (it) { return cleanItem_(it, date, q); });
   const log = readLog_();
   if (log.filter(function (e) { return e.date === date; }).length + fresh.length > MAX_PER_DATE) throw new Error('Too many purchases on one date (max ' + MAX_PER_DATE + ')');
   const added = fresh.map(function (f) {
@@ -840,9 +849,450 @@ function setup() {
 // The FIRST tab is always the current month. When a new month begins, this copies it (same layout, formats,
 // merged cells, formulas), blanks all entries, writes the new month's dates (one row per day), and renames the OLD tab
 // to its month, e.g. "October 2026". The grocery / deposit logs of the old month are renamed along with it.
-function monthlyRollover() { return rollover_(false); }       // runs by itself every day (~1 AM); acts only once a new month has begun
-function rolloverNextMonthNow() { return rollover_(true); }   // optional: build the month after the current tab right now
-function installMonthlyTrigger() {                            // run ONCE from the editor, in each script
+function monthlyRollover() { return rollover_(false); }
+function rolloverNextMonthNow() { return rollover_(true); }
+function installMonthlyTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'monthlyRollover') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('monthlyRollover').timeBased().everyDays(1).atHour(1).create();
+}
+
+function load_(me) {
+  migrateOnce_();
+
+  const L = layout_(), v = L.v;
+  const cell = function (r, c) {
+    const x = (v[r] || [])[c];
+    return x === undefined ? '' : x;
+  };
+
+  const out = {
+    ok: true,
+    me: me,
+    names: NAMES,
+    layout: L.kind,
+    meals: {},
+    deposits: {},
+    spending: [],
+    mealDates: [],
+    depDates: [],
+    bazarRows: null,
+    depositLog: []
+  };
+
+  L.meals.rows.forEach(function (o) {
+    out.mealDates.push(o.k);
+    out.meals[o.k] = {};
+    NAMES.forEach(function (n) {
+      out.meals[o.k][n] =
+        L.meals.cols[n] === undefined ? '' : cell(o.r, L.meals.cols[n]);
+    });
+  });
+
+  L.dep.rows.forEach(function (o) {
+    out.depDates.push(o.k);
+    out.deposits[o.k] = {};
+    NAMES.forEach(function (n) {
+      out.deposits[o.k][n] =
+        L.dep.cols[n] === undefined ? '' : cell(o.r, L.dep.cols[n]);
+    });
+  });
+
+  // Grocery purchases for the current month.
+  const sheetDates = {};
+  L.spend.rows.forEach(function (o) {
+    sheetDates[o.k] = 1;
+  });
+
+  out.spending = sortEntries_(
+    readLog_().filter(function (e) {
+      return sheetDates[e.date];
+    })
+  ).map(function (e) {
+    return {
+      id: e.id,
+      date: e.date,
+      time: e.time,
+      amount: e.amount,
+      details: e.details,
+      bazarKorta: e.person,
+      addedByEmail: e.email,
+      addedByName: e.name
+    };
+  });
+
+  if (L.kind === 'blocks') {
+    out.bazarRows = L.spend.rows.map(function (o) {
+      const cells = {};
+      NAMES.forEach(function (n) {
+        const c = L.spend.cols[n];
+        cells[n] = c === undefined ? '' : cell(o.r, c);
+      });
+
+      return {
+        date: o.k,
+        time: normTime_(cell(o.r, L.dateCol + 1)),
+        cells: cells
+      };
+    });
+  }
+
+  // Deposits: individual log entries plus any difference
+  // between the log total and the amount in the sheet.
+  const depSet = {}, sums = {};
+
+  out.depDates.forEach(function (d) {
+    depSet[d] = 1;
+  });
+
+  readDepositLog_().forEach(function (e) {
+    if (!depSet[e.date]) return;
+
+    out.depositLog.push({
+      id: e.id,
+      date: e.date,
+      time: e.time,
+      person: e.person,
+      amount: e.amount,
+      addedByEmail: e.email,
+      addedByName: e.name,
+      pseudo: false
+    });
+
+    const key = e.date + '|' + e.person;
+    sums[key] = r2_((sums[key] || 0) + e.amount);
+  });
+
+  out.depDates.forEach(function (d) {
+    NAMES.forEach(function (n) {
+      const key = d + '|' + n;
+      const diff = r2_(
+        num_(out.deposits[d][n]) - (sums[key] || 0)
+      );
+
+      if (Math.abs(diff) >= 0.01) {
+        out.depositLog.push({
+          id: 'rest|' + d + '|' + n,
+          date: d,
+          time: '',
+          person: n,
+          amount: diff,
+          addedByEmail: '',
+          addedByName: '',
+          pseudo: true
+        });
+      }
+    });
+  });
+
+  out.depMeta = depMetaMap_();
+  out.mealNotes = notes_();
+
+  if (me.admin) {
+    out.members = members_();
+    out.alerts = alerts_();
+  }
+
+  return out;
+}
+function rollover_(force) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    const ss = ss_(), cur = main_(), first = layout_(cur).meals.rows[0].k;
+    const y = Number(first.slice(0, 4));
+    const m = Number(first.slice(5, 7));
+
+    let ty = y, tm = m + 1;
+    if (tm > 12) {
+      tm = 1;
+      ty++;
+    }
+
+    if (!force) {
+      const today = Utilities.formatDate(
+        new Date(),
+        ss.getSpreadsheetTimeZone(),
+        'yyyy-MM'
+      );
+
+      if (first.slice(0, 7) >= today) {
+        Logger.log('Nothing to do: the first tab is already ' + first.slice(0, 7));
+        return 'Nothing to do';
+      }
+
+      ty = Number(today.slice(0, 4));
+      tm = Number(today.slice(5, 7));
+    }
+
+    let liveName = cur.getName();
+    let archive = MONTH_NAMES[m - 1] + ' ' + y;
+    let k = 2;
+
+    while (archive !== cur.getName() && ss.getSheetByName(archive)) {
+      archive = MONTH_NAMES[m - 1] + ' ' + y + ' (' + (k++) + ')';
+    }
+
+    if (liveName === archive) liveName = 'Current month';
+
+    const copy = cur.copyTo(ss);
+    copy.setName('new_' + Date.now());
+
+    try {
+      prepareMonth_(copy, ty, tm);
+    } catch (e) {
+      ss.deleteSheet(copy);
+      throw e;
+    }
+
+    cur.setName(archive);
+    copy.setName(liveName);
+    ss.setActiveSheet(copy);
+    ss.moveActiveSheet(1);
+
+    ['GroceryLog', 'DepositLog'].forEach(function (n) {
+      const t = ss.getSheetByName(n);
+      if (t) {
+        try {
+          t.setName(n + ' ' + archive);
+        } catch (e) {
+          Logger.log('Could not rename ' + n + ': ' + e.message);
+        }
+      }
+    });
+
+    const msg = 'New tab for ' + MONTH_NAMES[tm - 1] + ' ' + ty +
+      ' is ready. The old tab is now "' + archive + '".';
+
+    Logger.log(msg);
+    return msg;
+  } finally {
+    lock.releaseLock();
+  }
+}
+// A person's sheet cell = number of meals: each filled box counts 1 (or the number typed in it).
+function mealCount_(a, b) {
+  let t = 0;
+  [a, b].forEach(function (x) {
+    x = String(x || '').trim();
+    if (!x) return;
+    t += /^[0-9]+(\.[0-9]+)?$/.test(x) ? parseFloat(x) : 1;
+  });
+  return t;
+}
+function setMeal_(me, q) {
+  if (NAMES.indexOf(q.person) < 0) throw new Error('Unknown person');
+  const mode = me.admin ? 'admin' : (me.name === q.person ? 'self' : (me.mealsFor.indexOf(q.person) >= 0 ? 'add' : ''));
+  if (!mode) throw new Error('You are not allowed to edit meals for ' + q.person);
+  const L = layout_(), row = L.meals.rows.find(function (o) { return o.k === q.date; });
+  if (!row) throw new Error('That date is not in the sheet');
+  const lunch = String(q.lunch || '').slice(0, 300), dinner = String(q.dinner || '').slice(0, 300);
+  const range = L.sh.getRange(row.r + 1, L.meals.cols[q.person] + 1);
+  if (mode === 'add') {
+    const cur = range.getValue(), ex = notes_()[q.person + '|' + q.date] || { lunch: '', dinner: '' };
+    const has = cur !== '' && cur !== null && cur !== 'N/A';
+    if (!lunch && !dinner) throw new Error('Nothing to add');
+    if (has && !ex.lunch && !ex.dinner) throw new Error('This entry already exists. Only the admin can change it');
+    if ((ex.lunch && lunch !== ex.lunch) || (ex.dinner && dinner !== ex.dinner)) throw new Error('Saved entries can only be changed by the admin');
+  }
+  const n = mealCount_(lunch, dinner);
+  range.setValue(n > 0 ? n : '');
+  const s = tab_('MealDetails', ['Date', 'Person', 'Lunch', 'Dinner'], true), d = s.getDataRange().getValues();
+  let r = -1;
+  for (let i = 1; i < d.length; i++) if ((dateKey_(d[i][0]) || String(d[i][0])) === q.date && d[i][1] === q.person) { r = i + 1; break; }
+  if (r < 0) r = s.getLastRow() + 1;
+  s.getRange(r, 1, 1, 4).setValues([[q.date, q.person, lunch, dinner]]);
+  if (mode === 'add') log_(me, 'meal', q.person, 'Meal details for ' + q.person + ' on ' + q.date);
+}
+
+// ---------- Deposits ----------
+function depCell_(q) {
+  if (NAMES.indexOf(q.person) < 0) throw new Error('Unknown person');
+  const L = layout_(), row = L.dep.rows.find(function (o) { return o.k === q.date; });
+  if (!row) throw new Error('That date is not in the sheet');
+  return { L: L, range: L.sh.getRange(row.r + 1, L.dep.cols[q.person] + 1) };
+}
+function setDepCell_(c, val) { val = r2_(val); c.range.setValue(val > 0 ? val : ''); }
+function addDeposit_(me, q) {
+  const amt = Number(q.amount); if (!isFinite(amt) || amt <= 0) throw new Error('Enter a valid amount');
+  const c = depCell_(q), np = nowParts_();
+  setDepCell_(c, num_(c.range.getValue()) + amt);
+  const dl = readDepositLog_();
+  dl.push({ id: newId_(), date: q.date, time: np.time, person: q.person, amount: amt, email: me.email, name: me.name });
+  writeDepositLog_(dl);
+  saveDepositMeta_(q.date, q.person, me);
+}
+function latestDepositDate_(L, person) {
+  let best = '';
+  L.dep.rows.forEach(function (o) { if (num_((L.v[o.r] || [])[L.dep.cols[person]]) > 0 && o.k > best) best = o.k; });
+  return best;
+}
+// Edit one deposit entry (id), or the "sheet entry" (id 'rest|date|person'). Admin: any. A member: only their own latest deposit date.
+function editDeposit_(me, q) {
+  const amt = Number(q.amount), id = String(q.id || ''), isRest = id.indexOf('rest|') === 0;
+  if (!isFinite(amt) || (!isRest && amt < 0)) throw new Error('Enter a valid amount');
+  const c = depCell_(q);
+  if (!me.admin) {
+    if (me.name !== q.person) throw new Error('Only the admin or ' + q.person + ' can edit this deposit');
+    if (amt <= 0) throw new Error('Only the admin can remove a deposit');
+    if (latestDepositDate_(c.L, q.person) !== q.date) throw new Error('You can only edit your own latest deposit');
+  }
+  const dl = readDepositLog_(), cur = num_(c.range.getValue());
+  const mine = dl.filter(function (e) { return e.date === q.date && e.person === q.person; });
+  const sum = mine.reduce(function (t, e) { return t + e.amount; }, 0);
+  let old;
+  if (!id) { old = cur; setDepCell_(c, amt); }
+  else if (isRest) { old = cur - sum; setDepCell_(c, sum + amt); }
+  else {
+    const e = mine.find(function (x) { return x.id === id; });
+    if (!e) throw new Error('Deposit entry not found');
+    old = e.amount;
+    setDepCell_(c, cur - e.amount + amt);
+    if (amt > 0) e.amount = amt; else dl.splice(dl.indexOf(e), 1);
+    writeDepositLog_(dl);
+  }
+  if (!me.admin) log_(me, 'deposit', q.person, 'Edited deposit on ' + q.date + ': \u09F3' + r2_(old) + ' \u2192 \u09F3' + amt);
+}
+function clearDeposit_(q) {
+  const c = depCell_(q), id = String(q.id || ''), dl = readDepositLog_(), cur = num_(c.range.getValue());
+  const mine = dl.filter(function (e) { return e.date === q.date && e.person === q.person; });
+  if (!id) { c.range.setValue(''); writeDepositLog_(dl.filter(function (e) { return mine.indexOf(e) < 0; })); }
+  else if (id.indexOf('rest|') === 0) setDepCell_(c, mine.reduce(function (t, e) { return t + e.amount; }, 0));
+  else {
+    const e = mine.find(function (x) { return x.id === id; });
+    if (!e) throw new Error('Deposit entry not found');
+    setDepCell_(c, cur - e.amount);
+    writeDepositLog_(dl.filter(function (x) { return x !== e; }));
+  }
+  if (!id || mine.length <= 1) {
+    const s = depositMeta_(), r = metaRow_(s, [q.date, q.person]);
+    if (r && num_(c.range.getValue()) <= 0) s.getRange(r, 1, 1, 4).setValues([['', '', '', '']]);
+  }
+}
+
+// ---------- Grocery actions ----------
+function cleanItem_(it, date, q) {
+  const person = String(it.bazarKorta || it.person || '').trim();
+  if (NAMES.indexOf(person) < 0) throw new Error('Choose the \u09AC\u09BE\u099C\u09BE\u09B0\u0995\u09B0\u09CD\u09A4\u09BE (who did the bazar) for every purchase');
+  const amount = Number(it.amount); if (!isFinite(amount) || amount <= 0) throw new Error('Enter a valid amount for every purchase');
+  const time = normTime_(it.time);
+  if (!time) throw new Error('Enter the time of every purchase');
+  checkNotFuture_(date, time, q);
+  return { person: person, amount: amount, time: time, details: String(it.details || '').trim().slice(0, 3000) };
+}
+// q.items = [{ bazarKorta, time, amount, details }, ...] all on q.date. Every item becomes its own row under that date in the sheet.
+function addSpending_(me, q) {
+  const date = String(q.date || '');
+  const items = Array.isArray(q.items) && q.items.length ? q.items : [{ bazarKorta: q.bazarKorta, time: q.time || nowParts_().time, amount: q.amount, details: q.details }];
+  const L = layout_();
+  if (!L.spend.rows.some(function (o) { return o.k === date; })) throw new Error('That date is not in the sheet');
+  const fresh = items.map(function (it) { return cleanItem_(it, date, q); });
+  const log = readLog_();
+  if (log.filter(function (e) { return e.date === date; }).length + fresh.length > MAX_PER_DATE) throw new Error('Too many purchases on one date (max ' + MAX_PER_DATE + ')');
+  const added = fresh.map(function (f) {
+    return { id: newId_(), date: date, time: f.time, person: f.person, amount: f.amount, details: f.details, email: me.email, name: me.name };
+  });
+  const all = log.concat(added);
+  writeLog_(all);
+  renderGrocery_(all, [date]);
+  return added;
+}
+// Admin: any entry. A member with the grocery permission: only an entry of the latest date, and only if they added it.
+function editSpending_(me, q) {
+  const log = readLog_(), e = log.find(function (x) { return x.id === String(q.id || ''); });
+  if (!e) throw new Error('Grocery entry not found');
+  const amt = Number(q.amount); if (!isFinite(amt) || amt < 0) throw new Error('Enter a valid amount');
+  const person = q.bazarKorta ? String(q.bazarKorta).trim() : e.person;
+  if (NAMES.indexOf(person) < 0) throw new Error('Choose the বাজারকর্তা from the listed people');
+  const time = q.time !== undefined && q.time !== '' ? normTime_(q.time) : e.time;
+  if (q.time !== undefined && q.time !== '' && !time) throw new Error('Enter a valid time');
+  if (!me.admin) {
+    if (!me.canGrocery) throw new Error('You do not have the grocery permission');
+    if (amt <= 0) throw new Error('Only the admin can remove a grocery entry');
+    if (latestSpendDate_(log) !== e.date) throw new Error('Only the latest grocery entries can be edited');
+    if (!e.email || e.email !== me.email) throw new Error('Only the person who added this entry (or the admin) can edit it');
+  }
+  if (time !== e.time) checkNotFuture_(e.date, time, q);
+  const old = e.amount;
+  if (amt === 0) log.splice(log.indexOf(e), 1);
+  else { e.amount = amt; e.person = person; e.time = time; if (q.details !== undefined) e.details = String(q.details).trim().slice(0, 3000); }
+  writeLog_(log); renderGrocery_(log, [e.date]);
+  if (!me.admin) log_(me, 'spending', '', 'Edited grocery on ' + e.date + ': \u09F3' + old + ' \u2192 \u09F3' + amt);
+}
+function clearSpending_(q) {
+  const log = readLog_(), e = log.find(function (x) { return x.id === String(q.id || ''); });
+  if (!e) throw new Error('Grocery entry not found');
+  const rest = log.filter(function (x) { return x !== e; });
+  writeLog_(rest); renderGrocery_(rest, [e.date]);
+}
+
+function saveMember_(q) {
+  if (NAMES.indexOf(q.name) < 0) throw new Error('Unknown name');
+  const email = String(q.email || '').trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Enter a valid Google email');
+  const list = members_(), s = tab_('Members', MEMBER_HEADERS);
+  if (list.some(function (m) { return m.email === email && m.name !== q.name; })) throw new Error('That email is already used by someone else');
+  const cur = list.find(function (m) { return m.name === q.name; });
+  if (cur) s.getRange(cur.row, 1).setValue(email);
+  else s.appendRow([email, q.name, false, '', false, false, false, false, '', '', '']);
+}
+function makeAdmin_(q) {
+  const email = String(q.email || '').trim().toLowerCase(), list = members_(), s = tab_('Members', MEMBER_HEADERS);
+  if (!list.some(function (m) { return m.email === email; })) throw new Error('Not a member');
+  list.forEach(function (m) { s.getRange(m.row, 3).setValue(m.email === email); });
+}
+function savePerms_(q) {
+  const email = String(q.email || '').trim().toLowerCase(), m = members_().find(function (x) { return x.email === email; });
+  if (!m) throw new Error('Not a member');
+  const clean = function (a) { return (Array.isArray(a) ? a : []).filter(function (n) { return NAMES.indexOf(n) >= 0 && n !== m.name; }); };
+  const funds = clean(q.fundsFor), meals = clean(q.mealsFor);
+  const union = NAMES.filter(function (n) { return funds.indexOf(n) >= 0 || meals.indexOf(n) >= 0; });
+  const views = (Array.isArray(q.views) ? q.views : []).filter(function (k) { return VIEW_KEYS.indexOf(k) >= 0; });
+  tab_('Members', MEMBER_HEADERS).getRange(m.row, 4, 1, 8).setValues([[union.join(','), !!q.canGrocery, !!q.canGrocery,
+    funds.length > 0, meals.length > 0, funds.join(',') || '-', meals.join(',') || '-', views.join(',') || '-']]);
+}
+
+// ---------- Activity log + alerts for the admin ----------
+function activity_() { return tab_('Activity', ['Time', 'By', 'Type', 'For', 'Detail', 'Acknowledged'], true); }
+function log_(me, type, forName, detail) {
+  const s = activity_(), r = s.getLastRow() + 1;
+  s.getRange(r, 1, 1, 6).setValues([[new Date().toISOString(), me.name, type, forName || '', String(detail).slice(0, 500), false]]);
+}
+function alerts_() {
+  const d = activity_().getDataRange().getValues(), out = [];
+  for (let i = 1; i < d.length; i++) {
+    if (!d[i][0] || bool_(d[i][5])) continue;
+    out.push({ row: i + 1, time: String(d[i][0]), by: d[i][1], type: d[i][2], forName: d[i][3], detail: d[i][4] });
+  }
+  return out.slice(-100);
+}
+function ack_(q) {
+  const s = activity_(), d = s.getDataRange().getValues();
+  if (d.length < 2) return;
+  const col = [];
+  for (let i = 1; i < d.length; i++) {
+    let v = bool_(d[i][5]);
+    if (!v && d[i][0] && (q.all || (q.type && d[i][2] === q.type))) v = true;
+    col.push([v]);
+  }
+  s.getRange(2, 6, col.length, 1).setValues(col);
+}
+
+// ---------- One-time setup: run this once from the editor ----------
+function setup() {
+  tab_('Members', MEMBER_HEADERS);
+  tab_('MealDetails', ['Date', 'Person', 'Lunch', 'Dinner'], true);
+  activity_(); members_(); depositMeta_(); glTab_(); dlTab_();
+  migrateOnce_();
+  applyTotals_(false);
+}
+
+// ---------- Monthly rollover ----------
+// The FIRST tab is always the current month. When a new month begins, this copies it (same layout, formats, merged cells, formulas),
+// blanks all entries, writes the new month's dates (one row per day), and renames the OLD tab to its month, e.g. "October 2026".
+function monthlyRollover() { return rollover_(false); }
+function rolloverNextMonthNow() { return rollover_(true); }
+function installMonthlyTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'monthlyRollover') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('monthlyRollover').timeBased().everyDays(1).atHour(1).create();
 }
@@ -873,7 +1323,7 @@ function rollover_(force) {
     copy.setName(liveName);
     ss.setActiveSheet(copy);
     ss.moveActiveSheet(1);
-    ['GroceryLog', 'DepositLog'].forEach(function (n) {           // keep last month's logs next to last month's tab
+    ['GroceryLog', 'DepositLog'].forEach(function (n) {
       const t = ss.getSheetByName(n);
       if (t) { try { t.setName(n + ' ' + archive); } catch (e) { Logger.log('Could not rename ' + n + ': ' + e.message); } }
     });
@@ -883,7 +1333,7 @@ function rollover_(force) {
   } finally { lock.releaseLock(); }
 }
 
-function removeExtras_(sh) {                 // extra rows (more purchases on one date) are not carried into a new month
+function removeExtras_(sh) {
   const L = layout_(sh), dup = [];
   const runs = L.kind === 'blocks' ? [L.spend.rows] : [L.meals.rows, L.spend.rows, L.dep.rows];
   runs.forEach(function (run) { run.forEach(function (o, i) { if (i > 0 && o.k === run[i - 1].k) dup.push(o.r); }); });
@@ -934,7 +1384,7 @@ function prepareMonth_(sh, year, month) {
     clearCol(L.dep.rows, L.dep.cols[n]);
     if (L.kind === 'blocks') clearCol(L.spend.rows, L.spend.cols[n]);
   });
-  if (L.kind === 'blocks') {                       // grocery details are cell notes, times sit next to the date: clear them too
+  if (L.kind === 'blocks') {
     NAMES.forEach(function (n) {
       const c = L.spend.cols[n];
       if (c !== undefined) sh.getRange(L.spend.rows[0].r + 1, c + 1, L.spend.rows.length, 1).clearNote();
@@ -948,13 +1398,13 @@ function prepareMonth_(sh, year, month) {
 }
 
 // ---------- Sync: copy the source sheet's data into THIS sheet (layout untouched) ----------
-function writeCol_(sh, rows, col, valueOf) {        // rows = the real (first) row of every date; extra rows in between are left alone
+function writeCol_(sh, rows, col, valueOf) {
   const r0 = rows[0].r, rng = sh.getRange(r0 + 1, col + 1, rows[rows.length - 1].r - r0 + 1, 1);
   const vals = rng.getValues(), fx = rng.getFormulas();
   rows.forEach(function (o) {
     const i = o.r - r0;
     let v = valueOf(o.k);
-    if (v === undefined || fx[i][0]) return;          // not in source / keep formulas
+    if (v === undefined || fx[i][0]) return;
     if (v === null) v = '';
     if (String(vals[i][0]) !== String(v)) sh.getRange(o.r + 1, col + 1).setValue(v);
   });
@@ -974,7 +1424,7 @@ function callSource_(body) {
 function syncFromSource_(me, idToken) {
   if (!SOURCE_URL) throw new Error("SOURCE_URL is not set in this sheet's script");
   const first = layout_();
-  if (first.kind === 'blocks') pushFromSheet_(first);      // anything typed by hand in this sheet goes to the source BEFORE we overwrite it
+  if (first.kind === 'blocks') pushFromSheet_(first);
   const src = callSource_({ action: 'load', idToken: idToken });
 
   const L = layout_(), sh = L.sh, warn = [];
@@ -982,26 +1432,22 @@ function syncFromSource_(me, idToken) {
     return (k >= BLANK_NA_FROM && k <= BLANK_NA_TO && String(v).trim().toUpperCase() === 'N/A') ? '' : v;
   };
 
-  // meals + deposits: same cells, same people, same dates
   NAMES.forEach(function (n) {
     if (L.meals.cols[n] !== undefined) writeCol_(sh, L.meals.rows, L.meals.cols[n], function (k) { return src.meals && src.meals[k] ? blankNa(k, src.meals[k][n]) : undefined; });
     if (L.dep.cols[n] !== undefined) writeCol_(sh, L.dep.rows, L.dep.cols[n], function (k) { return src.deposits && src.deposits[k] ? blankNa(k, src.deposits[k][n]) : undefined; });
   });
 
-  // deposit log (each deposit)
   writeDepositLog_((src.depositLog || []).filter(function (e) { return !e.pseudo; }).map(function (e) {
     return { id: e.id, date: e.date, time: e.time || '', person: e.person, amount: num_(e.amount), email: e.addedByEmail || '', name: e.addedByName || '' };
   }));
 
-  // grocery log: copy every purchase, then draw them (extra rows are inserted / removed under each date).
-  // Entries with no বাজারকর্তা are kept in the log but simply not drawn in this sheet (no warning).
   const glog = (src.spending || []).filter(function (e) { return num_(e.amount) > 0; }).map(function (e) {
     return { id: e.id, date: e.date, time: e.time || '', person: e.bazarKorta || '', amount: num_(e.amount), details: cleanDet_(e.details), email: e.addedByEmail || '', name: e.addedByName || '' };
   });
   writeLog_(glog);
   renderGrocery_(glog, null);
+  snapAll_(layout_());
 
-  // notes (lunch / dinner text) + who-added info
   const notes = [];
   Object.keys(src.mealNotes || {}).forEach(function (key) {
     const i = key.indexOf('|'), person = key.slice(0, i), date = key.slice(i + 1), n = src.mealNotes[key];
@@ -1020,7 +1466,6 @@ function syncFromSource_(me, idToken) {
 }
 
 // ---------- বেলা হিসাব -> খাদ্য তথ্য: purchases typed by hand in the bazar block ----------
-// Reads the bazar block (date, time column next to the date, person columns, cell notes = details).
 function sheetEntries_(L) {
   const notes = L.sh.getDataRange().getNotes(), out = {};
   groups_(L).forEach(function (g) {
@@ -1037,7 +1482,6 @@ function sheetEntries_(L) {
   });
   return out;
 }
-// Match what is in the sheet with the entries we already know (same person + time first, then same person), keeping their id / details / author.
 function reconcile_(date, sheetList, existing) {
   const left = existing.slice(), matched = sheetList.map(function () { return null; });
   sheetList.forEach(function (s, i) {
@@ -1059,30 +1503,62 @@ function sig_(list) {
   return JSON.stringify(list.map(function (e) { return [e.time || '', e.person, Number(e.amount), String(e.details || '').trim()]; })
     .sort(function (a, b) { return JSON.stringify(a) < JSON.stringify(b) ? -1 : 1; }));
 }
+
+// ---------- Bazar sheet snapshot protection ----------
+function h_(s) {
+  return Utilities.base64Encode(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, String(s))
+  ).slice(0, 12);
+}
+function viewSig_(list) {
+  return h_(sig_(list.map(function (s) {
+    return { time: s.time, person: s.person, amount: s.amount, details: s.note };
+  })));
+}
+function snapAll_(L) {
+  const sheet = sheetEntries_(L);
+  const snap = {};
+  Object.keys(sheet).forEach(function (d) { snap[d] = viewSig_(sheet[d]); });
+  PropertiesService.getScriptProperties().setProperty('SNAP', JSON.stringify(snap));
+}
 function pushFromSheet_(L) {
   if (!SOURCE_URL) return 0;
-  const log = readLog_(), today = nowParts_().date, sheet = sheetEntries_(L), byDate = {}, changes = {};
+  const P = PropertiesService.getScriptProperties();
+  const raw = P.getProperty('SNAP');
+  if (!raw) return 0;
+
+  const snap = JSON.parse(raw), empty = viewSig_([]), log = readLog_(), today = nowParts_().date;
+  const sheet = sheetEntries_(L), byDate = {}, changes = {}, seen = [];
   log.forEach(function (e) { (byDate[e.date] = byDate[e.date] || []).push(e); });
+
   let future = 0;
   Object.keys(sheet).forEach(function (d) {
-    if (d > today) { if (sheet[d].length) future++; return; }                 // never push future dates
-    // entries that have no বাজারকর্তা cannot be shown in this sheet, so they are carried along untouched (never deleted)
+    const current = viewSig_(sheet[d]);
+    if (current === (snap[d] || empty)) return;
+    if (d > today) { future++; return; }
+    seen.push(d);
     const keep = (byDate[d] || []).filter(function (e) { return NAMES.indexOf(e.person) < 0; });
     const known = (byDate[d] || []).filter(function (e) { return NAMES.indexOf(e.person) >= 0; });
     const merged = reconcile_(d, sheet[d], known).concat(keep);
     if (sig_(merged) !== sig_(byDate[d] || [])) changes[d] = merged;
   });
-  if (future) { try { ss_().toast('Grocery entries on future dates are ignored and will be cleared.', 'বেলা হিসাব', 8); } catch (e) { /* no UI */ } }
+
+  if (future) {
+    try { ss_().toast('Grocery entries on future dates are ignored and will be cleared.', 'বেলা হিসাব', 8); }
+    catch (e) {}
+  }
+
   const dates = Object.keys(changes);
-  if (!dates.length) return 0;
-  const res = callSource_({ action: 'importBazar', secret: SYNC_SECRET, changes: changes });
-  const canon = res.entries || {};
-  const next = log.filter(function (e) { return !canon[e.date]; });         // replace those dates with the source's version (it knows the ids)
-  Object.keys(canon).forEach(function (d) { canon[d].forEach(function (e) { next.push(e); }); });
-  writeLog_(next);
+  if (dates.length) {
+    const res = callSource_({ action: 'importBazar', secret: SYNC_SECRET, changes: changes });
+    const canon = res.entries || {}, next = log.filter(function (e) { return !canon[e.date]; });
+    Object.keys(canon).forEach(function (d) { canon[d].forEach(function (e) { next.push(e); }); });
+    writeLog_(next);
+  }
+  seen.forEach(function (d) { snap[d] = viewSig_(sheet[d]); });
+  if (seen.length) P.setProperty('SNAP', JSON.stringify(snap));
   return dates.length;
 }
-// Runs (as an installable trigger) after every manual edit in this spreadsheet.
 function onBazarEdit(e) {
   try {
     if (!SOURCE_URL || !e || !e.range) return;
@@ -1093,11 +1569,10 @@ function onBazarEdit(e) {
     const cols = NAMES.map(function (n) { return L.spend.cols[n]; }).filter(function (c) { return c !== undefined; }).concat([L.dateCol + 1]);
     if (!L.spend.rows.some(function (o) { return o.r >= r1 && o.r <= r2; }) || !cols.some(function (c) { return c >= c1 && c <= c2; })) return;
     const lock = LockService.getScriptLock();
-    if (!lock.tryLock(20000)) return;                // the 5-minute sweep will pick it up
+    if (!lock.tryLock(20000)) return;
     try { pushFromSheet_(L); } finally { lock.releaseLock(); }
-  } catch (err) { Logger.log('onBazarEdit: ' + err.message); }    // not pushed now: bazarSweep retries every 5 minutes
+  } catch (err) { Logger.log('onBazarEdit: ' + err.message); }
 }
-// Safety net: catches note edits (Sheets does not fire onEdit for notes) and pushes that failed earlier.
 function bazarSweep() {
   if (!SOURCE_URL) return;
   const lock = LockService.getScriptLock();
@@ -1106,7 +1581,7 @@ function bazarSweep() {
   catch (err) { Logger.log('bazarSweep: ' + err.message); }
   finally { lock.releaseLock(); }
 }
-function installBazarTriggers() {                     // run ONCE from the editor in the বেলা হিসাব script
+function installBazarTriggers() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (['onBazarEdit', 'bazarSweep'].indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t);
   });
@@ -1114,7 +1589,7 @@ function installBazarTriggers() {                     // run ONCE from the edito
   ScriptApp.newTrigger('bazarSweep').timeBased().everyMinutes(5).create();
 }
 
-// খাদ্য তথ্য side: receives the purchases found in the বেলা হিসাব sheet. For every date it was given, the log of that date is replaced.
+// খাদ্য তথ্য side: receives purchases from the বেলা হিসাব sheet. For each supplied date, its log is replaced.
 function importBazar_(q) {
   if (SOURCE_URL) throw new Error('Only the খাদ্য তথ্য sheet accepts this');
   const L = layout_(), valid = {}, today = nowParts_().date, log = readLog_(), out = {}, changes = q.changes || {};
@@ -1125,11 +1600,10 @@ function importBazar_(q) {
     out[d] = (changes[d] || []).slice(0, MAX_PER_DATE).map(function (s) {
       const person = String(s.person || ''), amount = Number(s.amount), prev = s.id ? old.find(function (o) { return o.id === s.id; }) : null;
       if (!(amount > 0)) return null;
-      if (NAMES.indexOf(person) < 0 && !prev) return null;                     // an unknown person is only accepted for an entry that already existed
+      if (NAMES.indexOf(person) < 0 && !prev) return null;
       return { id: prev ? prev.id : newId_(), date: d, time: normTime_(s.time), person: person, amount: amount, details: String(s.details || '').trim().slice(0, 3000),
         email: prev ? prev.email : String(s.email || ''), name: prev ? prev.name : String(s.name || SHEET_USER) };
     }).filter(Boolean);
-    // entries of this date that have no বাজারকর্তা are never removed by a sync from the other sheet
     const kept = out[d].map(function (e) { return e.id; });
     old.forEach(function (e) { if (NAMES.indexOf(e.person) < 0 && kept.indexOf(e.id) < 0) out[d].push(e); });
   });
@@ -1142,3 +1616,6 @@ function importBazar_(q) {
   log_({ name: SHEET_USER }, 'spending', '', 'Grocery changed in the বেলা হিসাব sheet on ' + dates.join(', '));
   return { entries: out };
 }
+
+
+function resetBazarSnapshot() { PropertiesService.getScriptProperties().deleteProperty('SNAP'); }
