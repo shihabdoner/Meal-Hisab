@@ -311,7 +311,10 @@ main{padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env
   .printBar button{flex:1 1 45%}
 }
 
-/* ---- Sheet switcher (several spreadsheets side by side) ---- */
+/* ---- Sheet switcher (admin only) ---- */
 .bookBar{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 12px;font-family:"Exo 2",sans-serif}
 .bookBar label{color:#9a9a9a;font-size:.85rem}
 .bookBar select{width:auto;min-width:180px;margin:0;border-color:#09ff00;font-weight:600}
+
+/* ---- Hidden-card layout: a lone card fills the row on phones ---- */
+@media(max-width:899px){.grid>.card.fill{grid-column:1/-1}}
