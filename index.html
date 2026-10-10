@@ -11,7 +11,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Cascadia+Code:ital,wght@0,200..700;1,200..700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,100..900;1,100..900&family=Merienda:wght@300..900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=2">
+<script>document.write('<link rel="stylesheet" href="style.css?v=' + Date.now() + '">')</script>
+
 </head>
 <body>
 <main>
@@ -178,6 +179,12 @@
   </div>
 </main>
 <div id="report"></div>
-<script type="module" src="app.js?v=2"></script>
+<script>
+  const s = document.createElement("script");
+  s.type = "module";
+  s.src = "app.js?v=" + Date.now();
+  document.body.appendChild(s);
+</script>
+
 </body>
 </html>
