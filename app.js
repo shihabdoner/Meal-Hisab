@@ -7,6 +7,13 @@ const firebaseConfig = CFG.firebaseConfig;
 
 const $ = id => document.getElementById(id);
 const NAMES = ["Shohan", "Naved", "Salman", "Rifat", "Shihab", "Ashmit"];
+
+// What the admin can show / hide for each member (keys match VIEW_KEYS in the Apps Script)
+const VIEW_SHEETS = [["sheetMeals", "Meals (per day) table"], ["sheetSpending", "Grocery spending table"], ["sheetDeposits", "Deposits table"]];
+const VIEW_CARDS = [["myDep", "My deposit to fund"], ["resid", "My residuals"], ["due", "My dues"], ["lastFund", "Most recent added fund"],
+  ["lastDate", "সর্বশেষ বাজারের তারিখ"], ["lastGrocery", "Last grocery spending"], ["totalFund", "Total fund"], ["totalSpent", "Total spending"], ["left", "Money left in the fund"]];
+const ALL_VIEWS = [...VIEW_SHEETS, ...VIEW_CARDS].map(x => x[0]);
+
 const fmt = n => "৳" + (Math.round(n * 100) / 100).toLocaleString("en-US");
 const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const todayIso = iso(new Date());
@@ -37,15 +44,6 @@ fillNameSelect("spBazarKorta", "— বাজারকর্তা নির্�
 const isUrl = u => /^https?:\/\//.test(u || "") && !String(u).includes("PASTE_");
 const books = (Array.isArray(CFG.BOOKS) && CFG.BOOKS.length ? CFG.BOOKS : [{ id: "main", label: "খাদ্য তথ্য", url: CFG.SCRIPT_URL }]).filter(b => isUrl(b.url));
 if (!books.length) { $("setup").hidden = false; throw new Error("No sheet connected"); }
-let bookIdx = 0;
-try { const i = books.findIndex(b => b.id === localStorage.getItem("book")); if (i >= 0) bookIdx = i; } catch (e) { /* private mode */ }
-const book = () => books[bookIdx];
-$("bookTitle").textContent = book().label;
-if (books.length > 1) {
-  $("bookBar").hidden = false;
-  books.forEach((b, i) => { const o = document.createElement("option"); o.value = i; o.textContent = b.label; $("bookSel").appendChild(o); });
-  $("bookSel").value = bookIdx;
-}
 
 const auth = getAuth(initializeApp(firebaseConfig));
 let me = null;            // the real signed-in user (from the sheet's Members tab)
@@ -55,19 +53,48 @@ let inlineOpen = false, permDirty = false;
 const mealDirty = { lunch: false, dinner: false };
 let spBazarDirty = false;
 
+// Members always see the "bazar" sheet (বেলা হিসাব). The admin chooses with the dropdown.
+// Every write goes to ALL sheets, so they stay in sync.
+const memberIdx = Math.max(0, books.findIndex(b => b.id === "bazar"));
+let adminIdx = 0, lastLoadIdx = -1;
+try { const i = books.findIndex(b => b.id === localStorage.getItem("book")); if (i >= 0) adminIdx = i; } catch (e) { /* private mode */ }
+const showIdx = () => (me && me.admin && !previewName) ? adminIdx : memberIdx;
+const book = () => books[showIdx()];
+books.forEach((b, i) => { const o = document.createElement("option"); o.value = i; o.textContent = b.label; $("bookSel").appendChild(o); });
+$("bookSel").value = adminIdx;
+$("bookTitle").textContent = book().label;
+$("bookSel").addEventListener("change", () => {
+  adminIdx = Number($("bookSel").value);
+  try { localStorage.setItem("book", books[adminIdx].id); } catch (e) { /* ignore */ }
+  inlineOpen = false; permDirty = false; resetMealDirty(); spBazarDirty = false;
+  refresh(true);
+});
+
 // ---------- API (Google Apps Script web app on top of the sheet) ----------
 const isPreview = () => !!(me && me.admin && previewName);
-async function api(action, payload = {}) {
-  if (action !== "load" && isPreview()) throw new Error("Preview mode: switch back to “Your admin view” to make changes.");
-  const idToken = await auth.currentUser.getIdToken();
-  const r = await fetch(book().url, { method: "POST", body: JSON.stringify({ action, idToken, ...payload }) });
+async function call(url, action, payload, idToken) {
+  const r = await fetch(url, { method: "POST", body: JSON.stringify({ action, idToken, ...payload }) });
   const j = await r.json();
   if (!j.ok) throw new Error(j.error || "Request failed");
   return j;
 }
+async function api(action, payload = {}) {
+  if (action !== "load" && isPreview()) throw new Error("Preview mode: switch back to “Your admin view” to make changes.");
+  const idToken = await auth.currentUser.getIdToken();
+  const primary = book();
+  if (action === "load") lastLoadIdx = showIdx();
+  const j = await call(primary.url, action, payload, idToken);
+  const mirrors = books.filter(b => b !== primary);
+  if (action !== "load" && mirrors.length) {
+    const fails = [];
+    await Promise.all(mirrors.map(m => call(m.url, action, payload, idToken).catch(e => fails.push(m.label + ": " + e.message))));
+    if (fails.length) throw new Error("Saved in " + primary.label + " but NOT in the other sheet (" + fails.join("; ") + "). Fix it there by hand and don't resubmit, or " + primary.label + " will double count.");
+  }
+  return j;
+}
 async function act(action, payload) {
   try { await api(action, payload); await refresh(true); return true; }
-  catch (e) { alert(e.message); return false; }
+  catch (e) { alert(e.message); refresh(true); return false; }
 }
 
 // ---------- Sign-in ----------
@@ -84,18 +111,6 @@ $("gBtn").onclick = async () => {
 $("out").onclick = $("deniedOut").onclick = () => signOut(auth);
 $("refresh").onclick = () => refresh(true);
 
-$("bookSel").addEventListener("change", () => {
-  bookIdx = Number($("bookSel").value);
-  try { localStorage.setItem("book", book().id); } catch (e) { /* ignore */ }
-  $("bookTitle").textContent = book().label;
-  me = null; U = null; S = null; previewName = ""; inlineOpen = false; permDirty = false; resetMealDirty(); spBazarDirty = false;
-  ["fundWho", "mealWho"].forEach(id => { $(id).value = ""; });
-  setLive(false);
-  if (!auth.currentUser) return showLogin();
-  showLogin("Loading " + book().label + "…", true); $("deniedOut").hidden = true;
-  refresh(true);
-});
-
 function showLogin(msg, denied) {
   $("app").hidden = true; $("login").hidden = false;
   $("loginMsg").textContent = msg || "Sign in with the Google account the admin added for you.";
@@ -104,7 +119,8 @@ function showLogin(msg, denied) {
 function setLive(on) { const l = $("live"); l.textContent = on ? "● live" : "● offline"; l.className = "live " + (on ? "on" : "off"); }
 
 onAuthStateChanged(auth, user => {
-  clearInterval(poll); me = null; U = null; S = null; previewName = ""; setLive(false);
+  clearInterval(poll); me = null; U = null; S = null; previewName = ""; lastLoadIdx = -1; setLive(false);
+  $("bookTitle").textContent = book().label;
   if (!user) return showLogin();
   $("loginMsg").textContent = "Loading…";
   refresh(true);
@@ -116,7 +132,9 @@ async function refresh(force) {
   if (busy && !force) return;
   busy = true;
   try {
-    S = await api("load"); me = S.me; setLive(true);
+    S = await api("load"); me = S.me;
+    if (showIdx() !== lastLoadIdx) { S = await api("load"); me = S.me; }   // admin: reload from the chosen sheet
+    setLive(true);
     $("login").hidden = true; $("app").hidden = false;
     applyRole(); render(); renderAlerts(); syncMeal(); syncSpBazar();
   } catch (e) {
@@ -128,7 +146,7 @@ async function refresh(force) {
 // ---------- Who is the interface for (admin preview) ----------
 function effectiveMember() {
   const m = (S.members || []).find(x => x.name === previewName);
-  return m || { name: previewName, email: "", admin: false, addFor: [], fundsFor: [], mealsFor: [], canGrocery: false, canFunds: false, canMeals: false };
+  return m || { name: previewName, email: "", admin: false, addFor: [], fundsFor: [], mealsFor: [], canGrocery: false, canFunds: false, canMeals: false, views: ALL_VIEWS };
 }
 function buildPreviewSelect() {
   const sel = $("adminPreview");
@@ -143,7 +161,7 @@ $("adminPreview").addEventListener("change", () => {
   const who = previewName || me.name;
   $("fundWho").value = who; $("mealWho").value = who;
   resetMealDirty(); inlineOpen = false;
-  applyRole(); render(); renderAlerts(); syncMeal(); syncSpBazar();
+  refresh(true);       // the preview must load the member's sheet
 });
 
 function applyRole() {
@@ -154,13 +172,42 @@ function applyRole() {
   $("previewNotice").hidden = !isPreview();
   $("adminPreview").hidden = !me.admin;
   if (me.admin) buildPreviewSelect();
+  $("bookBar").hidden = !(me.admin && !previewName && books.length > 1);
+  $("bookSel").value = adminIdx;
+  $("bookTitle").textContent = book().label;
   document.querySelectorAll(".adminOnly").forEach(el => { el.hidden = !U.admin; });
   $("spendAddBox").hidden = !(U.admin || U.canGrocery);
   ["fundWho", "mealWho"].forEach(id => { if (!$(id).value && NAMES.includes(U.name)) $(id).value = U.name; });
+  applyViews();
   if (U.admin) {
     if (!$("memberList").contains(document.activeElement)) renderMembers();
     if (!permDirty && !$("permEditor").contains(document.activeElement)) renderPermissionEditor();
   }
+}
+
+// ---------- Permissions: which cards / tables a member can see ----------
+const canSee = k => !!U && (U.admin || (U.views || ALL_VIEWS).includes(k));
+function applyViews() {
+  const map = { myDepCard: "myDep", resFundCard: "resid", resCard: "resid", dueFundCard: "due", dueCard: "due",
+    lastFundCard: "lastFund", lastFundMineCard: "lastFund", lastDateCard: "lastDate", lastGroceryCard: "lastGrocery",
+    fundCard: "totalFund", spentCard: "totalSpent", leftcard: "left",
+    sheetMeals: "sheetMeals", sheetSpending: "sheetSpending", sheetDeposits: "sheetDeposits" };
+  Object.keys(map).forEach(id => { $(id).hidden = !canSee(map[id]); });
+  document.querySelectorAll(".grid").forEach(g => {
+    const cards = [...g.children];
+    cards.forEach(c => c.classList.remove("fill"));
+    g.hidden = cards.every(c => c.hidden);
+    let pending = null;
+    cards.filter(c => !c.hidden).forEach(c => {
+      if (c.classList.contains("wide")) { if (pending) pending.classList.add("fill"); pending = null; }
+      else pending = pending ? null : c;
+    });
+    if (pending) pending.classList.add("fill");      // a lone card fills the row
+  });
+  $("sheetHead").hidden = !["sheetMeals", "sheetSpending", "sheetDeposits"].some(canSee);
+  const pa = { my: ["myDep", "resid", "due"].some(canSee), fund: ["totalFund", "totalSpent", "left"].every(canSee), bazar: canSee("sheetSpending") };
+  document.querySelectorAll("[data-p]").forEach(b => { b.hidden = b.dataset.p === "all" ? !(pa.my && pa.fund && pa.bazar) : !pa[b.dataset.p]; });
+  document.querySelector(".printBar").hidden = ![...document.querySelectorAll("[data-p]")].some(b => !b.hidden);
 }
 
 // ---------- Numbers ----------
@@ -434,6 +481,8 @@ function syncPermissionEditor() {
   permDraft = {};
   NAMES.filter(n => n !== name).forEach(n => { permDraft[n] = { funds: (u.fundsFor || []).includes(n), meals: (u.mealsFor || []).includes(n) }; });
   $("permGrocery").checked = !!u.canGrocery;
+  const vs = u.views || ALL_VIEWS;
+  document.querySelectorAll("#permEditor [data-view]").forEach(i => { i.checked = vs.includes(i.dataset.view); });
   permTarget = "";
   drawPermWho(); drawPermTarget();
 }
@@ -463,13 +512,21 @@ function drawPermTarget() {                    // that person's permissions appe
   permDirty = true; drawPermWho();
 }));
 $("permGrocery").addEventListener("change", () => { permDirty = true; });
+// Sheet view + dashboard card checkboxes (built once)
+[["permViewSheets", VIEW_SHEETS], ["permViewCards", VIEW_CARDS]].forEach(([box, list]) => list.forEach(([k, label]) => {
+  const l = document.createElement("label"); l.className = "chip";
+  const i = document.createElement("input"); i.type = "checkbox"; i.dataset.view = k;
+  i.addEventListener("change", () => { permDirty = true; });
+  l.append(i, " " + label); $(box).appendChild(l);
+}));
 $("permPerson").addEventListener("change", () => { permDirty = false; syncPermissionEditor(); });
 $("savePerms").addEventListener("click", async () => {
   const name = $("permPerson").value, u = (S.members || []).find(x => x.name === name);
   if (!u) return;
   const ok = await act("savePerms", {
     email: u.email, canGrocery: $("permGrocery").checked,
-    fundsFor: Object.keys(permDraft).filter(n => permDraft[n].funds), mealsFor: Object.keys(permDraft).filter(n => permDraft[n].meals) });
+    fundsFor: Object.keys(permDraft).filter(n => permDraft[n].funds), mealsFor: Object.keys(permDraft).filter(n => permDraft[n].meals),
+    views: [...document.querySelectorAll("#permEditor [data-view]")].filter(i => i.checked).map(i => i.dataset.view) });
   if (ok) { permDirty = false; syncPermissionEditor(); }
 });
 
