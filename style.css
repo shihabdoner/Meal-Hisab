@@ -452,3 +452,41 @@ body.isMember .secMeal textarea:focus{outline-color:#26ff00;animation:none}
   body.isMember .secMeal th,body.isMember .secMeal td,
   body.isMember .secMeal .mealHistoryRow b.amt{animation:none}
 }
+
+
+
+/* =====================================================
+   GROCERY / FUND UPDATE
+   multiple purchases per date, time chips, "See more" slides
+   ===================================================== */
+.form .fullRow{grid-column:1/-1}
+.spItems{display:grid;gap:10px}
+.spItem{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;border:1px dashed var(--ac,#09ff00);border-radius:8px;background:#ffffff08}
+.spItemHead{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center}
+.spItemTitle{font-size:.85rem;color:#9a9a9a}
+.spItem .fld{min-width:0}
+.spItem .fld.full{grid-column:1/-1}
+.spItem .fld label{display:block;font-size:.8rem;color:#9a9a9a;margin-bottom:2px}
+.spItem .fld select{margin-bottom:0}
+button.plusBtn{background:none;color:var(--ac,#05f072);border:1px dashed var(--ac,#05f072);border-radius:8px}
+.timeChip{display:inline-block;font-size:.78rem;font-weight:600;padding:1px 6px;border:1px solid #6a6a6a;border-radius:4px;color:#d0d0d0;margin-right:2px;white-space:nowrap}
+
+.spDay{margin-bottom:12px}
+.spDayHead{font-size:.85rem;color:#9a9a9a;margin:6px 0}
+.spendingRow .spendingDescription{min-width:0}
+.clampBody{white-space:pre-line;overflow-wrap:anywhere}
+.slide{overflow:hidden}
+button.moreBtn{background:none;border:0;padding:2px 0;min-height:0;font-size:.8rem;color:greenyellow;box-shadow:none;border-radius:0;text-decoration:underline}
+button.moreBtn:hover,button.moreBtn:active{background:none;border:0;box-shadow:none;color:#fff}
+.spDay>button.moreBtn{display:block;margin:2px 0 0 4px}
+
+/* member (dark, calm) theme */
+body.isMember .timeChip{border-color:#3a4a40;color:#b4beb8}
+body.isMember .spItem{border-color:#2f3a33;background:#1a201c}
+body.isMember button.plusBtn{background:none;color:#8fd1a6;border:1px dashed #3f7d58}
+body.isMember button.plusBtn:hover{background:#1f2a23;color:#fff}
+body.isMember button.moreBtn{background:none;border:0;color:#8fd1a6}
+body.isMember button.moreBtn:hover{background:none;color:#fff}
+body.isMember .spDayHead,body.isMember .spItemTitle,body.isMember .spItem .fld label{color:#8a968e}
+
+@media(max-width:440px){.spItem{grid-template-columns:1fr}}
