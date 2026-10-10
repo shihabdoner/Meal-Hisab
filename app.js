@@ -40,6 +40,35 @@ fillNameSelect("fundWho", "— নাম নির্বাচন করুন �
 fillNameSelect("mealWho", "— নাম নির্বাচন করুন —");
 fillNameSelect("spBazarKorta", "— বাজারকর্তা নির্বাচন করুন —");
 
+// ---------- Members: slide-open sections ----------
+document.querySelectorAll(".sec").forEach(sec => {
+  const title = sec.querySelector(".secTitle");
+  const body = document.createElement("div"); body.className = "secBody";
+  const inner = document.createElement("div"); inner.className = "secInner";
+  [...sec.children].filter(c => c !== title).forEach(c => inner.appendChild(c));
+  body.appendChild(inner); sec.appendChild(body);
+  const toggle = () => {
+    if (!document.body.classList.contains("isMember")) return;   // admin: nothing happens
+    title.setAttribute("aria-expanded", sec.classList.toggle("open"));
+  };
+  title.addEventListener("click", toggle);
+  title.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+});
+let wasMember = null;
+function setMemberView(on) {
+  document.body.classList.toggle("isMember", on);
+  document.querySelectorAll(".sec").forEach(sec => {
+    const t = sec.querySelector(".secTitle");
+    if (on) { t.setAttribute("role", "button"); t.tabIndex = 0; }
+    else { t.removeAttribute("role"); t.removeAttribute("tabindex"); t.removeAttribute("aria-expanded"); sec.classList.remove("open"); }
+    if (on && wasMember !== true) {                // first time in member view: Meal open, others closed
+      const open = sec.classList.contains("secMeal");
+      sec.classList.toggle("open", open); t.setAttribute("aria-expanded", open);
+    }
+  });
+  wasMember = on;
+}
+
 // Several Google Sheets are connected (each has its own Apps Script web app + Members tab).
 const isUrl = u => /^https?:\/\//.test(u || "") && !String(u).includes("PASTE_");
 const books = (Array.isArray(CFG.BOOKS) && CFG.BOOKS.length ? CFG.BOOKS : [{ id: "main", label: "খাদ্য তথ্য", url: CFG.SCRIPT_URL }]).filter(b => isUrl(b.url));
@@ -135,6 +164,7 @@ function showLogin(msg, denied) {
 function setLive(on) { const l = $("live"); l.textContent = on ? "● live" : "● offline"; l.className = "live " + (on ? "on" : "off"); }
 
 onAuthStateChanged(auth, user => {
+    document.body.classList.remove("isMember");
   clearInterval(poll); me = null; U = null; S = null; T = null; previewName = ""; autoSynced = false; setLive(false);
   $("bookTitle").textContent = srcBook.label;
   if (!user) return showLogin();
@@ -203,6 +233,7 @@ function applyRole() {
   if (me.admin) buildPreviewSelect();
   const adminView = !!(me.admin && !previewName);
   document.body.classList.toggle("isAdmin", adminView);      // members never get this class
+    setMemberView(!adminView);
   $("bookBar").hidden = !(adminView && books.length > 1);
   $("bookSel").value = adminIdx;
   $("bookTitle").textContent = srcBook.label;
