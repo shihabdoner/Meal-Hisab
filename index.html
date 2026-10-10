@@ -81,45 +81,50 @@
       <div id="spList"></div>
     </details>
 
-    <h2 class="flick">Fund details</h2>
-    <section class="card detailSection" id="fundSection">
-      <label for="fundWho">Select person</label>
-      <select id="fundWho"></select>
-      <div id="fundPerson" hidden>
-        <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
-        <div style="margin-top:10px"><b>জমাদানের তথ্য</b></div>
-        <div id="deps" class="muted"></div>
-        <form id="depForm" class="form" hidden>
-          <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" required>
-          <input id="depDate" type="date" required>
-          <button>+ Add deposit</button>
-        </form>
-      </div>
-    </section>
-
-    <h2 class="flick">Meal details</h2>
-    <section class="card detailSection" id="mealSection">
-      <label for="mealWho">Select person</label>
-      <select id="mealWho"></select>
-      <div id="mealPerson" hidden>
-        <div style="margin-top:6px"><b>Meal history</b></div>
-        <div id="mealHistory" class="historyList"></div>
-        <div class="mealEditor">
-          <label for="mealDate">Entry date</label>
-          <input id="mealDate" type="date" class="mdate">
-          <div class="tablewrap">
-            <table>
-              <tr><th>দুপুর</th><th>রাত</th></tr>
-              <tr><td><textarea id="lunch" aria-label="দুপুর"></textarea></td><td><textarea id="dinner" aria-label="রাত"></textarea></td></tr>
-            </table>
-          </div>
-          <label for="mealBazar">বাজারকর্তা</label>
-          <select id="mealBazar"></select>
-          <button id="mealSave" style="margin-top:8px" hidden>Save (add only)</button>
-          <div class="status" id="status"></div>
+    <div class="twoCol">
+      <div class="col">
+      <h2 class="flick">Fund details</h2>
+      <section class="card detailSection" id="fundSection">
+        <label for="fundWho">Select person</label>
+        <select id="fundWho"></select>
+        <div id="fundPerson" hidden>
+          <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
+          <div style="margin-top:10px"><b>জমাদানের তথ্য</b></div>
+          <div id="deps" class="muted"></div>
+          <form id="depForm" class="form" hidden>
+            <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" required>
+            <input id="depDate" type="date" required>
+            <button>+ Add deposit</button>
+          </form>
         </div>
+      </section>
       </div>
-    </section>
+      <div class="col">
+      <h2 class="flick">Meal details</h2>
+      <section class="card detailSection" id="mealSection">
+        <label for="mealWho">Select person</label>
+        <select id="mealWho"></select>
+        <div id="mealPerson" hidden>
+          <div style="margin-top:6px"><b>Meal history</b></div>
+          <div id="mealHistory" class="historyList"></div>
+          <div class="mealEditor">
+            <label for="mealDate">Entry date</label>
+            <input id="mealDate" type="date" class="mdate">
+            <div class="tablewrap">
+              <table>
+                <tr><th>দুপুর</th><th>রাত</th></tr>
+                <tr><td><textarea id="lunch" aria-label="দুপুর"></textarea></td><td><textarea id="dinner" aria-label="রাত"></textarea></td></tr>
+              </table>
+            </div>
+            <label for="mealBazar">বাজারকর্তা</label>
+            <select id="mealBazar"></select>
+            <button id="mealSave" style="margin-top:8px" hidden>Save (add only)</button>
+            <div class="status" id="status"></div>
+          </div>
+        </div>
+      </section>
+      </div>
+    </div>
 
     <h2 class="flick">Sheet view</h2>
     <details class="card sheet"><summary>Meals (per day) <span class="alertDot" data-alert="meal" hidden></span></summary><div class="secAlert" data-alert="meal" hidden></div><div id="tblMeals" class="tablewrap"></div></details>
