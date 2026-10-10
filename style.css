@@ -321,65 +321,66 @@ main{padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env
 /* the sheet dropdown exists only in the admin's own view */
 body:not(.isAdmin) #bookBar{display:none!important}
 /* =====================================================
-   MEMBER INTERFACE ONLY (body.isMember) – light theme
+   MEMBER INTERFACE ONLY (body.isMember) – dark theme
    ===================================================== */
-body.isMember{background:#f5f7f5;color:#33403a}
-body.isMember .Fronttext{background:transparent;color:#5f8f6f}
-body.isMember .date{color:#7d8a82}
-body.isMember .date b{color:#4a8a62}
-body.isMember .live.on{color:#4caf78;text-shadow:none}
-body.isMember .live.off{color:#c28080}
-body.isMember .notice{background:#fff7e8;border:1px dashed #d9b36b;color:#8a6a2a}
-body.isMember .notice code{color:#5a4518}
-body.isMember .muted,body.isMember .status,body.isMember .month,body.isMember .printLabel{color:#7d8a82}
-body.isMember .topbar{color:#4a8a62}
+body.isMember{background:#101312;color:#d3dad5}
+body.isMember .Fronttext{background:transparent;color:#6fbf8b}
+body.isMember .date{color:#8a968e}
+body.isMember .date b{color:#8fd1a6}
+body.isMember .live.on{color:#6fbf8b;text-shadow:none}
+body.isMember .live.off{color:#c27a7a}
+body.isMember .notice{background:#221f17;border:1px dashed #6e5d33;color:#c9b27a}
+body.isMember .notice code{color:#e6d9b0}
+body.isMember .muted,body.isMember .status,body.isMember .month,body.isMember .printLabel{color:#8a968e}
+body.isMember .topbar{color:#8fd1a6}
 
 /* cards */
-body.isMember .card{background:#fff;border:1px solid #dfe6e1;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
-body.isMember .card .k{color:#7d8a82}
-body.isMember .card .v{color:#4a8a62;text-shadow:none}
-body.isMember #last,body.isMember #spent{color:#5f6b64}
-body.isMember .left{background:#eef6f0;border:1px solid #bcd8c5}
-body.isMember .left .v{color:#3f7d58}
-body.isMember .left.neg,body.isMember #dueCard.neg,body.isMember #dueFundCard.neg{background:#fbf0f0;border-color:#d9a3a3}
-body.isMember .left.neg .v,body.isMember #dueCard.neg .v,body.isMember #dueFundCard.neg .v{color:#b05555}
+body.isMember .card{background:#181d1a;border:1px solid #2a322d;border-radius:12px;box-shadow:none}
+body.isMember .card .k{color:#8a968e}
+body.isMember .card .v{color:#8fd1a6;text-shadow:none}
+body.isMember #last,body.isMember #spent{color:#b4beb8}
+body.isMember .left{background:#16211a;border:1px solid #2f5740}
+body.isMember .left .v{color:#8fd1a6}
+body.isMember .left.neg,body.isMember #dueCard.neg,body.isMember #dueFundCard.neg{background:#241617;border-color:#6e3d3d}
+body.isMember .left.neg .v,body.isMember #dueCard.neg .v,body.isMember #dueFundCard.neg .v{color:#d08a8a}
 
 /* headings, inputs, buttons */
-body.isMember h2.flick{animation:none;background:#e9eee9;color:#6b7a70;text-shadow:none;font-style:normal;border:1px dashed #b9cbbf}
-body.isMember summary{color:#4a8a62}
+body.isMember h2.flick{animation:none;background:#1a201c;color:#9aa89f;text-shadow:none;font-style:normal;border:1px dashed #33403a}
+body.isMember summary{color:#8fd1a6}
 body.isMember select,body.isMember input,body.isMember .form textarea,body.isMember .sec .form textarea,
-body.isMember .sec select,body.isMember .sec input{background:#fff;color:#33403a;border:1px solid #cfd9d2}
-body.isMember input::placeholder,body.isMember .form textarea::placeholder{color:#9aa59e}
-body.isMember input[type=date]{color-scheme:light}
-body.isMember textarea{color:#33403a}
-body.isMember textarea:focus,body.isMember .form textarea:focus{outline:2px solid #9bc9aa}
-body.isMember textarea[readonly]{background:#f1f4f2}
-body.isMember button{background:#e8efe9;color:#33403a;border:1px solid #cddad0;border-radius:8px}
-body.isMember button:hover,body.isMember button:active{background:#4a8a62;color:#fff;border-color:#4a8a62;box-shadow:none}
-body.isMember button.x{background:none;border:0;color:#9aa59e}
-body.isMember button.x:hover{background:none;color:#b05555}
+body.isMember .sec select,body.isMember .sec input{background:#202723;color:#d3dad5;border:1px solid #333e37}
+body.isMember input::placeholder,body.isMember .form textarea::placeholder{color:#76827a}
+body.isMember input[type=date]{color-scheme:dark}
+body.isMember textarea{color:#d3dad5}
+body.isMember textarea:focus,body.isMember .form textarea:focus{outline:2px solid #3f7d58}
+body.isMember textarea[readonly]{background:#171c19}
+body.isMember button{background:#232b26;color:#d3dad5;border:1px solid #333e37;border-radius:8px}
+body.isMember button:hover,body.isMember button:active{background:#3f7d58;color:#fff;border-color:#3f7d58;box-shadow:none}
+body.isMember button.x{background:none;border:0;color:#76827a}
+body.isMember button.x:hover{background:none;color:#d08a8a}
 
 /* rows and tables */
-body.isMember .row,body.isMember .sec .row{background:#f3f7f4;border:1px dashed #d3dfd6;color:#33403a}
-body.isMember .row b,body.isMember .sec .row b.amt{color:#4a8a62}
-body.isMember .sp-date,body.isMember .row b.sp-date,body.isMember .sec .sp-date,body.isMember .sec .row b.sp-date{background:#dcebe0;color:#33543f;border:1px solid #c2d9c8}
-body.isMember table,body.isMember .sec table{background:#fff;border:1px solid #dfe6e1}
-body.isMember th,body.isMember td{border:1px dashed #d3dfd6}
-body.isMember th,body.isMember .sec th{background:#f0f5f1;color:#4a8a62}
-body.isMember .sheetTbl th:first-child,body.isMember .sheetTbl td:first-child{background:#fff;color:#4a8a62}
-body.isMember .sheetTbl tr.today td,body.isMember .sheetTbl tr.today td:first-child{background:#e3f1e7;color:#2f4d3a}
-body.isMember .sheetTbl tr.total td{border-top:2px solid #4a8a62;color:#3f7d58}
-body.isMember #pt{color:#4a8a62}
+body.isMember .row,body.isMember .sec .row{background:#1d2420;border:1px dashed #2f3a33;color:#d3dad5}
+body.isMember .row b,body.isMember .sec .row b.amt{color:#8fd1a6}
+body.isMember .sp-date,body.isMember .row b.sp-date,body.isMember .sec .sp-date,body.isMember .sec .row b.sp-date{background:#27382d;color:#b9e0c6;border:1px solid #365143}
+body.isMember table,body.isMember .sec table{background:#181d1a;border:1px solid #2a322d}
+body.isMember th,body.isMember td{border:1px dashed #2f3a33}
+body.isMember th,body.isMember .sec th{background:#1f2622;color:#8fd1a6}
+body.isMember .sheetTbl th:first-child,body.isMember .sheetTbl td:first-child{background:#181d1a;color:#8fd1a6}
+body.isMember .sheetTbl tr.today td,body.isMember .sheetTbl tr.today td:first-child{background:#24382b;color:#d9efe0}
+body.isMember .sheetTbl tr.total td{border-top:2px solid #3f7d58;color:#8fd1a6}
+body.isMember #pt{color:#8fd1a6}
+body.isMember .alertBar,body.isMember .secAlert{background:#241617;border-color:#6e3d3d}
 
 /* sections: ash/green, Meal is the focus */
-body.isMember .sec{background:#fff;border:1px solid var(--ac);border-radius:14px;padding:10px}
-body.isMember .secGrocery{--ac:#c9d1cc}
-body.isMember .secFund{--ac:#bfd4c6}
-body.isMember .secMeal{--ac:#4a8a62;border-width:2px;box-shadow:0 4px 14px rgba(74,138,98,.15)}
-body.isMember .sec .card{border-color:#e1e8e3;box-shadow:none}
-body.isMember .sec summary,body.isMember .sec th{color:#4a8a62}
-body.isMember .secTitle{background:#eef3ef;color:#3d4d43;border:1px solid #dfe6e1;font-weight:600}
-body.isMember .secMeal .secTitle{background:#4a8a62;color:#fff;border-color:#4a8a62;font-size:1.15rem;padding:10px 12px}
+body.isMember .sec{background:#141815;border:1px solid var(--ac);border-radius:14px;padding:10px}
+body.isMember .secGrocery{--ac:#2e3631}
+body.isMember .secFund{--ac:#2b3f32}
+body.isMember .secMeal{--ac:#3f7d58;border-width:2px;box-shadow:0 4px 16px rgba(0,0,0,.35)}
+body.isMember .sec .card{border-color:#2a322d;box-shadow:none}
+body.isMember .sec summary,body.isMember .sec th{color:#8fd1a6}
+body.isMember .secTitle{background:#1d2420;color:#c3ccc6;border:1px solid #2a322d;font-weight:600}
+body.isMember .secMeal .secTitle{background:#2f6247;color:#eaf5ee;border-color:#3f7d58;font-size:1.15rem;padding:10px 12px}
 
 /* Meal first on the page, then the rest */
 body.isMember #app{display:flex;flex-direction:column}
