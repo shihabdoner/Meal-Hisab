@@ -17,13 +17,19 @@ const ALL_VIEWS = [...VIEW_SHEETS, ...VIEW_CARDS].map(x => x[0]);
 const fmt = n => "৳" + (Math.round(n * 100) / 100).toLocaleString("en-US");
 const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const todayIso = iso(new Date());
+const nowDate = () => iso(new Date());                       // always the real "today" (the page may stay open past midnight)
+const nowTime = () => { const d = new Date(); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
 const monthKey = todayIso.slice(0, 7);
 const num = x => { const n = Number(x); return (x === "" || x == null || isNaN(n)) ? 0 : n; };
 const lab = d => new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+const byWhen = (a, b) => a.date.localeCompare(b.date) || (a.time || "").localeCompare(b.time || "");
+const cleanDet = d => (d && d !== "N/A") ? d : "";
+const openMore = new Set();                                  // "See more" panels the person opened (kept across the 15 s refresh)
 
 $("monthLabel").textContent = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
 $("today").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 ["spDate", "depDate", "mealDate"].forEach(i => $(i).value = todayIso);
+$("spDate").max = todayIso;                                  // grocery cannot be added for a future date
 
 function fillNameSelect(id, blankLabel, exclude) {
   const sel = $(id), keep = sel.value;
@@ -38,7 +44,6 @@ function fillNameSelect(id, blankLabel, exclude) {
 }
 fillNameSelect("fundWho", "— নাম নির্বাচন করুন —");
 fillNameSelect("mealWho", "— নাম নির্বাচন করুন —");
-fillNameSelect("spBazarKorta", "— বাজারকর্তা নির্বাচন করুন —");
 
 // ---------- Members: slide-open sections ----------
 document.querySelectorAll(".sec").forEach(sec => {
@@ -75,7 +80,6 @@ const books = (Array.isArray(CFG.BOOKS) && CFG.BOOKS.length ? CFG.BOOKS : [{ id:
 if (!books.length) { $("setup").hidden = false; throw new Error("No sheet connected"); }
 
 // "খাদ্য তথ্য" is the source of truth: every number, history, alert and permission comes from it.
-// The other sheets are only synced copies. The Sheet view tables can show either one.
 const srcBook = books.find(b => b.id === "khaddo") || books[0];
 const otherBooks = books.filter(b => b !== srcBook);
 
@@ -87,7 +91,6 @@ let T = null, tblErr = ""; // data shown in the Sheet view tables
 let busy = false, poll = null, previewName = "", autoSynced = false;
 let inlineOpen = false, permDirty = false;
 const mealDirty = { lunch: false, dinner: false };
-let spBazarDirty = false;
 
 // Sheet view: members always see "বেলা হিসাব" (id "bazar"); the admin chooses with the dropdown.
 const memberIdx = Math.max(0, books.findIndex(b => b.id === "bazar"));
@@ -112,7 +115,6 @@ async function call(url, action, payload, idToken) {
   return j;
 }
 const loadSheet = async b => call(b.url, "load", {}, await auth.currentUser.getIdToken());
-// Ask every other sheet to copy the source sheet's data into its own layout
 async function syncMirrors(idToken) {
   idToken = idToken || await auth.currentUser.getIdToken();
   const fails = [];
@@ -124,7 +126,9 @@ async function syncMirrors(idToken) {
 async function api(action, payload = {}) {
   if (action !== "load" && isPreview()) throw new Error("Preview mode: switch back to “Your admin view” to make changes.");
   const idToken = await auth.currentUser.getIdToken();
-  const j = await call(srcBook.url, action, payload, idToken);      // always the source sheet
+  // the phone's date + time go along, so the sheet can refuse entries for a day / time that has not come yet
+  const body = action === "load" ? payload : { ...payload, today: nowDate(), now: nowTime() };
+  const j = await call(srcBook.url, action, body, idToken);      // always the source sheet
   if (action !== "load" && otherBooks.length) {
     const fails = await syncMirrors(idToken);
     if (fails.length) throw new Error("Saved in " + srcBook.label + ", but the other sheet is not fully updated (" + fails.join("; ") + "). Press ⟳ to sync again.");
@@ -164,7 +168,7 @@ function showLogin(msg, denied) {
 function setLive(on) { const l = $("live"); l.textContent = on ? "● live" : "● offline"; l.className = "live " + (on ? "on" : "off"); }
 
 onAuthStateChanged(auth, user => {
-    document.body.classList.remove("isMember");
+  document.body.classList.remove("isMember");
   clearInterval(poll); me = null; U = null; S = null; T = null; previewName = ""; autoSynced = false; setLive(false);
   $("bookTitle").textContent = srcBook.label;
   if (!user) return showLogin();
@@ -174,7 +178,6 @@ onAuthStateChanged(auth, user => {
 });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && auth.currentUser) refresh(); });
 
-// Sheet view tables: from the sheet chosen by tblIdx() (the source itself needs no second request)
 async function loadTables() {
   const b = books[tblIdx()];
   tblErr = "";
@@ -191,7 +194,7 @@ async function refresh(force) {
     $("login").hidden = true; $("app").hidden = false;
     applyRole();
     await loadTables();
-    render(); renderAlerts(); syncMeal(); syncSpBazar();
+    render(); renderAlerts(); syncMeal();
     if (me.admin && !autoSynced && otherBooks.length) {               // once per visit: bring the other sheet in line
       autoSynced = true;
       syncMirrors().then(f => { if (f.length) alert("Sync problem: " + f.join("; ")); });
@@ -220,7 +223,7 @@ $("adminPreview").addEventListener("change", () => {
   const who = previewName || me.name;
   $("fundWho").value = who; $("mealWho").value = who;
   resetMealDirty(); inlineOpen = false;
-  refresh(true);       // the preview shows the member's Sheet view
+  refresh(true);
 });
 
 function applyRole() {
@@ -233,7 +236,7 @@ function applyRole() {
   if (me.admin) buildPreviewSelect();
   const adminView = !!(me.admin && !previewName);
   document.body.classList.toggle("isAdmin", adminView);      // members never get this class
-    setMemberView(!adminView);
+  setMemberView(!adminView);
   $("bookBar").hidden = !(adminView && books.length > 1);
   $("bookSel").value = adminIdx;
   $("bookTitle").textContent = srcBook.label;
@@ -281,9 +284,7 @@ function relDate(d) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
 }
 
-// ---- stats (pure) ----
 // "in spending": my deposit - (this month's spending / people).  "in fund": my deposit - (total fund / people).
-// Positive balance = residual, negative = due.
 function statsFor(S, name, email) {
   const r2 = x => Math.round(x * 100) / 100;
   const monthSpent = S.spending.filter(e => e.date.slice(0, 7) === monthKey).reduce((t, e) => t + num(e.amount), 0);
@@ -301,19 +302,44 @@ function statsFor(S, name, email) {
     balSpend: r2(dep - spendShare), balFund: r2(dep - fundShare),
     lastFund: entries[entries.length - 1] || null, lastFundByMe: mine[mine.length - 1] || null };
 }
-// ---- end stats ----
-const balanceOf = n => { const s = statsFor(S, n); return { dep: s.dep, share: s.spendShare, bal: s.balSpend }; };
-const monthSpent = () => statsFor(S, NAMES[0]).monthSpent;
 
-function setSelectValue(sel, v) {
-  if (v && ![...sel.options].some(o => o.value === v)) { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); }
-  sel.value = v || "";
-}
 const dateChip = d => { const b = document.createElement("b"); b.className = "sp-date"; b.textContent = d; return b; };
+const timeChip = t => { const b = document.createElement("b"); b.className = "timeChip"; b.textContent = "🕒 " + t; return b; };
+
+// ---------- "See more" slides ----------
+// target slides open / closed (max-height animation) with a small button under it
+function makeSlide(target, collapsed, key, moreTxt, lessTxt) {
+  const btn = document.createElement("button"); btn.type = "button"; btn.className = "moreBtn";
+  const set = open => { btn.textContent = open ? lessTxt : moreTxt; btn.setAttribute("aria-expanded", String(open)); };
+  target.style.overflow = "hidden"; target.style.transition = "max-height .35s ease";
+  if (openMore.has(key)) { target.style.maxHeight = "none"; set(true); } else { target.style.maxHeight = collapsed; set(false); }
+  btn.onclick = () => {
+    if (!openMore.has(key)) {
+      openMore.add(key); set(true);
+      target.style.maxHeight = target.scrollHeight + "px";
+      const done = () => { if (openMore.has(key)) target.style.maxHeight = "none"; target.removeEventListener("transitionend", done); };
+      target.addEventListener("transitionend", done);
+    } else {
+      openMore.delete(key); set(false);
+      target.style.maxHeight = target.scrollHeight + "px"; void target.offsetHeight;   // start the close from the real height
+      target.style.maxHeight = collapsed;
+    }
+  };
+  return btn;
+}
+// long text: first lines + "See more" that slides the rest open
+function clampEl(text, key) {
+  const wrap = document.createElement("div"); wrap.className = "clampWrap";
+  const body = document.createElement("div"); body.className = "clampBody"; body.textContent = text;
+  wrap.appendChild(body);
+  if (text.length > 110 || text.split("\n").length > 3) wrap.appendChild(makeSlide(body, "4.6em", "t:" + key, "See more ▾", "See less ▴"));
+  return wrap;
+}
 
 // ---------- Rendering ----------
 function render() {
   const st = statsFor(S, U.name, U.email);
+  $("spDate").max = nowDate();
   $("myDep").textContent = fmt(st.dep);
   $("myResFund").textContent = fmt(Math.max(st.balFund, 0));
   $("myDueFund").textContent = fmt(Math.max(-st.balFund, 0));
@@ -331,7 +357,7 @@ function render() {
   $("lastFundMineMeta").textContent = lm ? `${lm.date} · for ${lm.person}` : "";
 
   const spent = S.spending.filter(e => e.date <= todayIso);
-  const lastBazar = [...spent].filter(e => num(e.amount) > 0).sort((a, b) => a.date.localeCompare(b.date)).pop();
+  const lastBazar = spent.filter(e => num(e.amount) > 0).sort(byWhen).pop();
   $("lastDate").textContent = relDate(lastBazar && lastBazar.date);
   const out = spent.reduce((t, e) => t + num(e.amount), 0);
   $("fund").textContent = fmt(st.fundTotal);
@@ -342,10 +368,10 @@ function render() {
   const ld = $("lastd"); ld.textContent = "";
   if (lastBazar) {
     ld.appendChild(dateChip(lastBazar.date));
-    const det = lastBazar.details && lastBazar.details !== "N/A" ? lastBazar.details : "";
-    const baz = lastBazar.bazarKorta;
-    if (det) ld.append(" · " + det);
-    if (baz) ld.append(" · বাজারকর্তা: " + baz);
+    if (lastBazar.time) ld.appendChild(timeChip(lastBazar.time));
+    if (lastBazar.bazarKorta) ld.append(" · বাজারকর্তা: " + lastBazar.bazarKorta);
+    const det = cleanDet(lastBazar.details);
+    if (det) ld.appendChild(clampEl(det, "last"));
   }
 
   if (!inlineOpen) renderHistories();
@@ -355,31 +381,31 @@ function render() {
   renderTables();
 }
 
-const latestSpendingDate = () => {
-  const l = S.spending.filter(e => num(e.amount) > 0).map(e => e.date).sort().pop();
-  return l || "";
-};
+const latestSpendingDate = () => S.spending.filter(e => num(e.amount) > 0).map(e => e.date).sort().pop() || "";
 const canEditSpending = e => U.admin || !!(U.canGrocery && e.date === latestSpendingDate() && e.addedByEmail && e.addedByEmail === U.email);
 const canFundFor = who => !!(who && (U.admin || (U.fundsFor || []).includes(who)));
 
 function renderHistories() {
-  // grocery history (all dates, from the Grocery Spending table)
+  // grocery history: one block per date, every purchase of that date inside it
   const sl = $("spList"); sl.textContent = "";
-  const sp = S.spending.filter(e => num(e.amount) > 0).sort((a, b) => b.date.localeCompare(a.date) || NAMES.indexOf(a.bazarKorta) - NAMES.indexOf(b.bazarKorta));
+  const sp = S.spending.filter(e => num(e.amount) > 0);
   if (!sp.length) sl.textContent = "No spending yet";
-  sp.forEach(e => sl.appendChild(spendingRowEl(e)));
+  const byDate = {};
+  sp.forEach(e => (byDate[e.date] = byDate[e.date] || []).push(e));
+  Object.keys(byDate).sort().reverse().forEach(d => sl.appendChild(spendDateEl(d, byDate[d].sort(byWhen))));
 
-  // fund history of the selected person (all dates, from the Deposits table)
+  // fund history of the selected person: every deposit (date, time, who added it) – refreshed after each add / edit
   const who = $("fundWho").value;
   $("fundPerson").hidden = !who;
   $("depForm").hidden = !canFundFor(who);
   if (!who) return;
-  const mine = S.depDates.filter(d => num(S.deposits[d][who]) > 0).sort();
-  $("pt").textContent = fmt(mine.reduce((t, d) => t + num(S.deposits[d][who]), 0));
+  const mineDates = S.depDates.filter(d => num(S.deposits[d][who]) > 0).sort();
+  $("pt").textContent = fmt(mineDates.reduce((t, d) => t + num(S.deposits[d][who]), 0));
+  const latest = mineDates[mineDates.length - 1] || "";
+  const list = (S.depositLog || []).filter(e => e.person === who).sort((a, b) => b.date.localeCompare(a.date) || (b.time || "").localeCompare(a.time || ""));
   const dl = $("deps"); dl.textContent = "";
-  if (!mine.length) dl.textContent = "এখনো কোনো জমা নেই";
-  const latest = mine[mine.length - 1];
-  mine.slice().reverse().forEach(d => dl.appendChild(depositRowEl(d, who, d === latest)));
+  if (!list.length) dl.textContent = "এখনো কোনো জমা নেই";
+  list.forEach(e => dl.appendChild(depositRowEl(e, who, latest)));
 }
 
 function actionsEl(editFn, delFn) {
@@ -394,52 +420,77 @@ function actionsEl(editFn, delFn) {
 }
 function amountEl(text) { const v = document.createElement("b"); v.className = "amt"; v.textContent = text; return v; }
 
+// all purchases of one date. More than 3: the rest slide open under "See N more".
+function spendDateEl(d, list) {
+  const box = document.createElement("div"); box.className = "spDay";
+  const head = document.createElement("div"); head.className = "spDayHead";
+  head.appendChild(dateChip(d));
+  head.append(` ${list.length} purchase${list.length > 1 ? "s" : ""} · ${fmt(list.reduce((t, e) => t + num(e.amount), 0))}`);
+  box.appendChild(head);
+  const rows = list.map(spendingRowEl), LIM = 3;
+  rows.slice(0, LIM).forEach(r => box.appendChild(r));
+  if (rows.length > LIM) {
+    const slide = document.createElement("div"); slide.className = "slide";
+    rows.slice(LIM).forEach(r => slide.appendChild(r));
+    box.append(slide, makeSlide(slide, "0px", "day:" + d, `See ${rows.length - LIM} more ▾`, "See less ▴"));
+  }
+  return box;
+}
 function spendingRowEl(e) {
   const r = document.createElement("div"); r.className = "row spendingRow";
-  const a = document.createElement("span"); a.className = "spendingDescription";
-  a.appendChild(dateChip(e.date));
-  const det = e.details && e.details !== "N/A" ? e.details : "", baz = e.bazarKorta || "";
-  if (det) a.append(" · " + det);
-  if (baz) a.append(" · বাজারকর্তা: " + baz);
+  const a = document.createElement("div"); a.className = "spendingDescription";
+  const top = document.createElement("div");
+  if (e.time) top.appendChild(timeChip(e.time));
+  top.append((e.time ? " · " : "") + "বাজারকর্তা: " + (e.bazarKorta || "—"));
+  a.appendChild(top);
+  const det = cleanDet(e.details);
+  if (det) a.appendChild(clampEl(det, "d:" + e.id));
   const right = document.createElement("span"); right.className = "rowRight";
   right.append(amountEl(fmt(num(e.amount))),
-    actionsEl(canEditSpending(e) ? () => openInline(r, { title: `Edit grocery · ${e.date}`, amount: e.amount, details: det, withDetails: true, withBazar: true, bazar: baz || "", lockBazar: S.layout === "blocks",
-        save: (amount, details, bazarKorta) => act("editSpending", { date: e.date, person: baz, amount, details, bazarKorta }) }) : null,
-      U.admin ? () => act("clearSpending", { date: e.date, person: baz }) : null));
+    actionsEl(canEditSpending(e) ? () => openInline(r, { title: `Edit grocery · ${e.date}`, date: e.date, amount: e.amount, time: e.time, details: det,
+        withDetails: true, withBazar: true, withTime: true, bazar: e.bazarKorta || "",
+        save: (amount, details, bazarKorta, time) => act("editSpending", { id: e.id, amount, details, bazarKorta, time }) }) : null,
+      U.admin ? () => act("clearSpending", { id: e.id }) : null));
   r.append(a, right);
   return r;
 }
-function depositRowEl(d, who, isLatest) {
-  const amount = num(S.deposits[d][who]);
+function depositRowEl(e, who, latestDate) {
   const r = document.createElement("div"); r.className = "row";
-  const a = document.createElement("span"); a.appendChild(dateChip(d));
-  const editable = U.admin || (who === U.name && isLatest);
+  const a = document.createElement("span"); a.appendChild(dateChip(e.date));
+  if (e.time) a.appendChild(timeChip(e.time));
+  a.append(e.pseudo ? " · sheet entry" : (e.addedByName ? " · by " + e.addedByName : ""));
+  const editable = U.admin || (who === U.name && e.date === latestDate);
   const right = document.createElement("span"); right.className = "rowRight";
-  right.append(amountEl(fmt(amount)),
-    actionsEl(editable ? () => openInline(r, { title: `Edit ${who}'s fund · ${d} (total for this date)`, amount, withDetails: false,
-        save: amt => act("editDeposit", { date: d, person: who, amount: amt }) }) : null,
-      U.admin ? () => act("clearDeposit", { date: d, person: who }) : null));
+  right.append(amountEl(fmt(e.amount)),
+    actionsEl(editable ? () => openInline(r, { title: `Edit ${who}'s fund · ${e.date}${e.time ? " " + e.time : ""}`, amount: e.amount, withDetails: false, allowNegative: !!e.pseudo,
+        save: amt => act("editDeposit", { id: e.id, date: e.date, person: who, amount: amt }) }) : null,
+      U.admin ? () => act("clearDeposit", { id: e.id, date: e.date, person: who }) : null));
   r.append(a, right);
   return r;
 }
 
-// Inline editor (keeps multi-line details). Stays open during the 15 s refresh.
+// Inline editor. Stays open during the 15 s refresh.
 function openInline(rowNode, cfg) {
   inlineOpen = true;
   rowNode.textContent = ""; rowNode.classList.add("editing");
   const f = document.createElement("form"); f.className = "inlineEdit";
   const t = document.createElement("div"); t.className = "inlineTitle"; t.textContent = cfg.title;
-  const a = document.createElement("input"); a.type = "number"; a.step = "any"; a.min = "0"; a.required = true; a.value = cfg.amount;
+  const a = document.createElement("input"); a.type = "number"; a.step = "any"; if (!cfg.allowNegative) a.min = "0"; a.required = true; a.value = cfg.amount;
   f.append(t, a);
+  let tm = null;
+  if (cfg.withTime) {
+    const l = document.createElement("label"); l.className = "inlineLabel"; l.textContent = "Time";
+    tm = document.createElement("input"); tm.type = "time"; tm.value = cfg.time || ""; tm.required = true;
+    f.append(l, tm);
+  }
   let d = null;
   if (cfg.withDetails) { d = document.createElement("textarea"); d.rows = 4; d.value = cfg.details || ""; d.placeholder = "Details"; f.appendChild(d); }
   let bz = null;
   if (cfg.withBazar) {
     const l = document.createElement("label"); l.className = "inlineLabel"; l.textContent = "বাজারকর্তা";
     bz = document.createElement("select");
-    [["", "— বাজারকর্তা নির্বাচন করুন —"], ...NAMES.map(n => [n, n])].forEach(([v, t]) => { const o = document.createElement("option"); o.value = v; o.textContent = t; bz.appendChild(o); });
-    setSelectValue(bz, cfg.bazar || "");
-    bz.disabled = !!cfg.lockBazar || (!U.admin && !!cfg.bazar);   // new sheet: the amount sits in that person's cell, so it is fixed. Old sheet: non-admins can only fill it while empty
+    [["", "— বাজারকর্তা নির্বাচন করুন —"], ...NAMES.map(n => [n, n])].forEach(([v, tx]) => { const o = document.createElement("option"); o.value = v; o.textContent = tx; bz.appendChild(o); });
+    bz.value = cfg.bazar || "";
     f.append(l, bz);
   }
   const bar = document.createElement("div"); bar.className = "inlineBtns";
@@ -449,7 +500,8 @@ function openInline(rowNode, cfg) {
   bar.append(ok, no); f.appendChild(bar);
   f.onsubmit = async ev => {
     ev.preventDefault();
-    const done = await cfg.save(Number(a.value), d ? d.value : undefined, bz ? bz.value : undefined);
+    if (tm && cfg.date === nowDate() && tm.value > nowTime()) return alert("That time has not come yet.");
+    const done = await cfg.save(Number(a.value), d ? d.value : undefined, bz ? bz.value : undefined, tm ? tm.value : undefined);
     if (done) { inlineOpen = false; render(); }
   };
   rowNode.appendChild(f); a.focus();
@@ -498,13 +550,13 @@ function renderTables() {
     ["Total meal", ...sums(T.mealDates, T.meals)], todayIso));
   put("tblDeposits", table(["Tarikh", ...NAMES], T.depDates.map(d => [d, ...NAMES.map(n => T.deposits[d][n])]),
     ["Total", ...sums(T.depDates, T.deposits).map(fmt)], todayIso));
-  if (T.layout === "blocks" && T.bazarGrid) {
-    const dates = Object.keys(T.bazarGrid).sort();
-    put("tblSpending", table(["Tarikh", ...NAMES], dates.map(d => [d, ...NAMES.map(n => T.bazarGrid[d][n])]),
-      ["Total", ...sums(dates, T.bazarGrid).map(fmt)], todayIso));
+  if (T.layout === "blocks" && T.bazarRows) {          // one row per purchase (extra rows under a date), with its time
+    put("tblSpending", table(["Tarikh", "Time", ...NAMES], T.bazarRows.map(r => [r.date, r.time, ...NAMES.map(n => r.cells[n])]),
+      ["Total", "", ...NAMES.map(n => fmt(T.bazarRows.reduce((t, r) => t + num(r.cells[n]), 0)))], todayIso));
   } else {
-    put("tblSpending", table(["Tarikh", "Spending", "Details", "বাজারকর্তা"], T.spending.map(e => [e.date, e.amount, e.details, e.bazarKorta || ""]),
-      ["Total spending", fmt(T.spending.reduce((t, e) => t + num(e.amount), 0)), "", ""], todayIso));
+    const sp = T.spending.filter(e => num(e.amount) > 0).sort(byWhen);
+    put("tblSpending", table(["Tarikh", "Time", "Spending", "Details", "বাজারকর্তা"], sp.map(e => [e.date, e.time, e.amount, cleanDet(e.details), e.bazarKorta || ""]),
+      ["Total spending", "", fmt(sp.reduce((t, e) => t + num(e.amount), 0)), "", ""], todayIso));
   }
 }
 
@@ -552,7 +604,7 @@ function syncPermissionEditor() {
   drawPermWho(); drawPermTarget();
 }
 const permLabel = p => [p.funds ? "Funds" : "", p.meals ? "Meal details" : ""].filter(Boolean).join(" + ");
-function drawPermWho() {                       // "Select who's": pick a person to set what this member may add for them
+function drawPermWho() {
   const box = $("permWho"); box.textContent = "";
   Object.keys(permDraft).forEach(n => {
     const b = document.createElement("button"); b.type = "button";
@@ -564,7 +616,7 @@ function drawPermWho() {                       // "Select who's": pick a person 
   const lines = Object.keys(permDraft).filter(n => permDraft[n].funds || permDraft[n].meals).map(n => `${n}: ${permLabel(permDraft[n])}`);
   $("permSummary").textContent = lines.length ? "Can add for → " + lines.join(" · ") : "No add-on-behalf permissions yet";
 }
-function drawPermTarget() {                    // that person's permissions appear after selecting them
+function drawPermTarget() {
   $("permTargetBox").hidden = !permTarget;
   if (!permTarget) return;
   $("permTargetTitle").textContent = `Permissions for ${permTarget}`;
@@ -577,7 +629,6 @@ function drawPermTarget() {                    // that person's permissions appe
   permDirty = true; drawPermWho();
 }));
 $("permGrocery").addEventListener("change", () => { permDirty = true; });
-// Sheet view + dashboard card checkboxes (built once)
 [["permViewSheets", VIEW_SHEETS], ["permViewCards", VIEW_CARDS]].forEach(([box, list]) => list.forEach(([k, label]) => {
   const l = document.createElement("label"); l.className = "chip";
   const i = document.createElement("input"); i.type = "checkbox"; i.dataset.view = k;
@@ -595,22 +646,52 @@ $("savePerms").addEventListener("click", async () => {
   if (ok) { permDirty = false; syncPermissionEditor(); }
 });
 
-// ---------- Forms ----------
+// ---------- Grocery form: one date, one or more purchases (each with its own time and বাজারকর্তা) ----------
+const spItems = $("spItems");
+function spField(labelTxt, el, full) {
+  const w = document.createElement("div"); w.className = "fld" + (full ? " full" : "");
+  const l = document.createElement("label"); l.textContent = labelTxt;
+  w.append(l, el); return w;
+}
+function spItemEl() {
+  const box = document.createElement("div"); box.className = "spItem";
+  const head = document.createElement("div"); head.className = "spItemHead";
+  const title = document.createElement("span"); title.className = "spItemTitle";
+  const rm = document.createElement("button"); rm.type = "button"; rm.className = "x spRemove"; rm.textContent = "✕"; rm.title = "Remove this purchase";
+  rm.onclick = () => { box.remove(); renumberItems(); };
+  head.append(title, rm);
+  const who = document.createElement("select"); who.className = "spWho"; who.required = true;
+  [["", "— বাজারকর্তা —"], ...NAMES.map(n => [n, n])].forEach(([v, t]) => { const o = document.createElement("option"); o.value = v; o.textContent = t; who.appendChild(o); });
+  const time = document.createElement("input"); time.type = "time"; time.className = "spTime"; time.required = true; time.value = nowTime();
+  const amt = document.createElement("input"); amt.type = "number"; amt.className = "spAmt"; amt.min = "0"; amt.step = "any"; amt.placeholder = "Amount"; amt.required = true;
+  const det = document.createElement("textarea"); det.className = "spDet"; det.rows = 3; det.placeholder = "Details (what was bought) — Enter for a new line";
+  box.append(head, spField("বাজারকর্তা", who), spField("Time", time), spField("Amount", amt), spField("Details", det, true));
+  return box;
+}
+function renumberItems() {
+  const items = [...spItems.children];
+  items.forEach((b, i) => { b.querySelector(".spItemTitle").textContent = "Purchase " + (i + 1); b.querySelector(".spRemove").hidden = items.length < 2; });
+}
+function resetItems() { spItems.textContent = ""; spItems.appendChild(spItemEl()); renumberItems(); }
+resetItems();
+$("spAddRow").onclick = () => { spItems.appendChild(spItemEl()); renumberItems(); spItems.lastElementChild.querySelector(".spWho").focus(); };
+$("spDate").addEventListener("change", () => {
+  if ($("spDate").value > nowDate()) { alert("You cannot add grocery spending for a future date."); $("spDate").value = nowDate(); }
+});
 $("spForm").addEventListener("submit", async e => {
   e.preventDefault();
-  const ok = await act("addSpending", { date: $("spDate").value, amount: $("spAmt").value, details: $("spDet").value.trim(), bazarKorta: $("spBazarKorta").value });
-  if (ok) { $("spAmt").value = ""; $("spDet").value = ""; spBazarDirty = false; syncSpBazar(); }
+  const date = $("spDate").value;
+  if (!date) return;
+  if (date > nowDate()) return alert("You cannot add grocery spending for a future date.");
+  const items = [...spItems.children].map(b => ({
+    bazarKorta: b.querySelector(".spWho").value, time: b.querySelector(".spTime").value,
+    amount: b.querySelector(".spAmt").value, details: b.querySelector(".spDet").value.trim() }));
+  if (date === nowDate() && items.some(i => i.time > nowTime())) return alert("A purchase time later than now has not come yet. Please enter the real time.");
+  const ok = await act("addSpending", { date, items });
+  if (ok) resetItems();
 });
-// বাজারকর্তা is one person per date: pre-fill it from the sheet, and lock it for non-admins once set
-function syncSpBazar() {
-  if (!S) return;
-  if (S.layout === "blocks") { $("spBazarKorta").disabled = false; return; }   // new sheet: several people can shop on one date
-  const ex = (S.bazar || {})[$("spDate").value] || "";
-  if (!spBazarDirty) setSelectValue($("spBazarKorta"), ex);
-  $("spBazarKorta").disabled = !U.admin && !!ex;
-}
-$("spBazarKorta").addEventListener("change", () => { spBazarDirty = true; });
-$("spDate").addEventListener("change", () => { spBazarDirty = false; syncSpBazar(); });
+
+// ---------- Fund form ----------
 $("depForm").addEventListener("submit", async e => {
   e.preventDefault();
   const ok = await act("addDeposit", { date: $("depDate").value, person: $("fundWho").value, amount: $("depAmt").value });
@@ -618,11 +699,9 @@ $("depForm").addEventListener("submit", async e => {
 });
 $("fundWho").addEventListener("change", () => { inlineOpen = false; render(); });
 
-// ---------- Meal details: lunch / dinner / বাজারকর্তা ----------
-// Sheet cell = number of meals (a filled box counts 1, or the number typed); the text is kept in the MealDetails tab.
+// ---------- Meal details: lunch / dinner ----------
 const noteKey = () => `${$("mealWho").value}|${$("mealDate").value}`;
 const resetMealDirty = () => { mealDirty.lunch = mealDirty.dinner = false; };
-// full = admin or own meals (auto-save). add = permitted person adding for someone else (fill empty boxes, press Save).
 function mealMode() {
   const who = $("mealWho").value, date = $("mealDate").value;
   if (!U || !S || !who || !S.mealDates.includes(date)) return null;
@@ -666,7 +745,7 @@ async function sendMeal() {
   } catch (e) { $("status").textContent = "Save failed: " + e.message; }
 }
 let saveTimer;
-function autoSaveMeal() {                      // auto-save (full mode only)
+function autoSaveMeal() {
   if (mealMode() !== "full") return;
   $("status").textContent = "Saving…";
   clearTimeout(saveTimer); saveTimer = setTimeout(sendMeal, 600);
@@ -704,8 +783,8 @@ function buildReport(parts) {
       [`My spending share (${fmt(st.monthSpent)} ÷ ${NAMES.length})`, fmt(st.spendShare)],
       [st.balSpend < 0 ? "My due in spending" : "My residual in spending", fmt(Math.abs(st.balSpend))]]));
     add("rp-h3", "My deposits");
-    const mine = S.depDates.filter(d => num(S.deposits[d][U.name]) > 0);
-    if (mine.length) R.appendChild(rTable(["Date", "Amount"], mine.map(d => [d, fmt(num(S.deposits[d][U.name]))]), ["Total", fmt(st.dep)]));
+    const mine = (S.depositLog || []).filter(e => e.person === U.name).sort((a, b) => a.date.localeCompare(b.date) || (a.time || "").localeCompare(b.time || ""));
+    if (mine.length) R.appendChild(rTable(["Date", "Time", "Amount"], mine.map(e => [e.date, e.time || "", fmt(e.amount)]), ["Total", "", fmt(st.dep)]));
     else add("rp-note", "No deposits yet");
   }
   if (parts.includes("fund")) {
@@ -718,11 +797,11 @@ function buildReport(parts) {
     R.appendChild(rTable(["Name", "Deposit", "Residual in fund", "Due in fund", "Residual in spending", "Due in spending"], rows));
   }
   if (parts.includes("bazar")) {
-    const sp = S.spending.filter(e => num(e.amount) > 0).sort((x, y) => x.date.localeCompare(y.date) || NAMES.indexOf(x.bazarKorta) - NAMES.indexOf(y.bazarKorta));
+    const sp = S.spending.filter(e => num(e.amount) > 0).sort(byWhen);
     add("rp-h2", "Bazar data");
-    if (sp.length) R.appendChild(rTable(["Date", "Amount", "Details", "বাজারকর্তা"],
-      sp.map(e => [e.date, fmt(num(e.amount)), e.details === "N/A" ? "" : e.details, e.bazarKorta || ""]),
-      ["Total", fmt(sp.reduce((t, e) => t + num(e.amount), 0)), "", ""]));
+    if (sp.length) R.appendChild(rTable(["Date", "Time", "Amount", "Details", "বাজারকর্তা"],
+      sp.map(e => [e.date, e.time || "", fmt(num(e.amount)), cleanDet(e.details), e.bazarKorta || ""]),
+      ["Total", "", fmt(sp.reduce((t, e) => t + num(e.amount), 0)), "", ""]));
     else add("rp-note", "No bazar entries yet");
   }
 }
