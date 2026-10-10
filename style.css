@@ -195,3 +195,76 @@ textarea[readonly]{opacity:.75;cursor:not-allowed}
   .row{padding:5px}
   .detailSection{padding:10px}
 }
+
+/* ---- Phone screens ---- */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+main{padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
+.tablewrap{-webkit-overflow-scrolling:touch}
+.row span,.spendingDescription,.alertLine,.lastd{overflow-wrap:anywhere}
+/* keep the date column visible while a wide sheet table scrolls sideways */
+.sheetTbl th:first-child,.sheetTbl td:first-child{position:sticky;left:0;z-index:1;background:#021b02}
+.sheetTbl tr.today td:first-child{background:#016e30}
+
+@media(max-width:600px){
+  main{padding-top:10px;padding-bottom:36px}
+  .Fronttext{font-size:.85rem;margin:6px 0 10px}
+  .date{font-size:.85rem;margin-bottom:10px}
+  .grid{gap:8px}
+  .card{padding:10px}
+  .card .v{font-size:1.15rem;overflow-wrap:anywhere}
+  .card .k{font-size:.74rem}
+  h2.flick{font-size:.95rem;margin:18px 0 10px}
+  button{min-height:40px}
+  .editBtn,.alertHead button,.secAlert button{min-height:34px}
+  .topbar button{min-height:36px}
+  .printBtns{display:grid;grid-template-columns:1fr 1fr}
+  .form{gap:10px}
+  .inlineBtns button{flex:1}
+  .mrow button{width:100%}
+  .permGroup{padding:8px}
+  .permChips{gap:4px 12px}
+  .sheetTbl{font-size:.72rem}
+  .sheetTbl th,.sheetTbl td{padding:4px 5px}
+  th,td{padding:6px}
+  textarea{min-height:80px}
+}
+@media(max-width:340px){
+  .grid{grid-template-columns:1fr}
+  .Fronttext{font-size:.75rem}
+}
+
+/* ---- Computer screens ---- */
+.twoCol{display:block}
+@media(min-width:900px){
+  main{max-width:1100px;padding-top:24px}
+  .Fronttext{font-size:1.3rem;margin:10px 0 16px}
+  .date{font-size:1rem}
+  .grid{gap:12px}
+  .card{padding:16px}
+  .card .v{font-size:1.5rem}
+
+  /* personal cards: 4 columns */
+  .mine{grid-template-columns:repeat(4,1fr)}
+  .mine>.card.wide:first-child{grid-column:span 2}          /* My deposit to fund */
+  /* totals: 3 columns */
+  .grid:not(.mine){grid-template-columns:repeat(3,1fr)}
+  .grid:not(.mine) .left{grid-column:auto}
+
+  /* forms: amount + date side by side */
+  .form{grid-template-columns:1fr 1fr}
+  .form textarea,.form button{grid-column:1/-1}
+
+  /* Fund details | Meal details side by side */
+  .twoCol{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+  .twoCol .col h2.flick{margin-top:24px}
+
+  /* admin member rows on one line */
+  .mrow{grid-template-columns:130px 1fr auto auto;align-items:center}
+
+  .sheetTbl{font-size:.85rem;min-width:0}
+  .sheetTbl th,.sheetTbl td{padding:6px 10px}
+  .printBtns{flex-wrap:nowrap}
+}
+@media(min-width:1400px){
+  main{max-width:1240px}
+}
