@@ -74,12 +74,13 @@
         <details class="card" id="spendAddBox" hidden>
           <summary>+ Add grocery spending</summary>
           <form id="spForm" class="form">
-            <input id="spAmt" type="number" min="0" step="any" placeholder="Amount" required>
-            <input id="spDate" type="date" required>
-            <textarea id="spDet" rows="3" placeholder="Details (what was bought) — Enter for a new line"></textarea>
-            <label for="spBazarKorta" class="formLabel">বাজারকর্তা</label>
-            <select id="spBazarKorta" required></select>
-            <button>Add</button>
+            <div class="fullRow">
+              <label for="spDate" class="formLabel">Date (today or earlier — future dates are not allowed)</label>
+              <input id="spDate" type="date" required>
+            </div>
+            <div id="spItems" class="spItems fullRow"></div>
+            <button type="button" id="spAddRow" class="plusBtn fullRow">＋ Add another বাজারকর্তা / time</button>
+            <button class="fullRow">Add</button>
           </form>
         </details>
         <details class="card">
