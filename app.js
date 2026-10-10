@@ -448,23 +448,9 @@ function spendingRowEl(e) {
   const right = document.createElement("span"); right.className = "rowRight";
   right.append(amountEl(fmt(num(e.amount))),
     actionsEl(canEditSpending(e) ? () => openInline(r, { title: `Edit grocery · ${e.date}`, date: e.date, amount: e.amount, time: e.time, details: det,
-        withDetails: true, withBazar: true, withTime: true, bazar: e.bazarKorta || "",
-        save: (amount, details, bazarKorta, time) => act("editSpending", { id: e.id, amount, details, bazarKorta, time }) }) : null,
+        withDetails: true, withBazar: true, withTime: true, withDate: true, allowExtra: true, bazar: e.bazarKorta || "",
+        save: (amount, details, bazarKorta, time, date, extra) => act("editSpending", { id: e.id, amount, details, bazarKorta, time, date, extra }) }) : null,
       U.admin ? () => act("clearSpending", { id: e.id }) : null));
-  r.append(a, right);
-  return r;
-}
-function depositRowEl(e, who, latestDate) {
-  const r = document.createElement("div"); r.className = "row";
-  const a = document.createElement("span"); a.appendChild(dateChip(e.date));
-  if (e.time) a.appendChild(timeChip(e.time));
-  a.append(e.pseudo ? " · sheet entry" : (e.addedByName ? " · by " + e.addedByName : ""));
-  const editable = U.admin || (who === U.name && e.date === latestDate);
-  const right = document.createElement("span"); right.className = "rowRight";
-  right.append(amountEl(fmt(e.amount)),
-    actionsEl(editable ? () => openInline(r, { title: `Edit ${who}'s fund · ${e.date}${e.time ? " " + e.time : ""}`, amount: e.amount, withDetails: false, allowNegative: !!e.pseudo,
-        save: amt => act("editDeposit", { id: e.id, date: e.date, person: who, amount: amt }) }) : null,
-      U.admin ? () => act("clearDeposit", { id: e.id, date: e.date, person: who }) : null));
   r.append(a, right);
   return r;
 }
@@ -475,8 +461,15 @@ function openInline(rowNode, cfg) {
   rowNode.textContent = ""; rowNode.classList.add("editing");
   const f = document.createElement("form"); f.className = "inlineEdit";
   const t = document.createElement("div"); t.className = "inlineTitle"; t.textContent = cfg.title;
+  f.appendChild(t);
+  let dt = null;
+  if (cfg.withDate) {
+    const l = document.createElement("label"); l.className = "inlineLabel"; l.textContent = "Date" + (U.admin ? "" : " (only the admin can change it)");
+    dt = document.createElement("input"); dt.type = "date"; dt.value = cfg.date; dt.max = nowDate(); dt.required = true; dt.disabled = !U.admin;
+    f.append(l, dt);
+  }
   const a = document.createElement("input"); a.type = "number"; a.step = "any"; if (!cfg.allowNegative) a.min = "0"; a.required = true; a.value = cfg.amount;
-  f.append(t, a);
+  f.appendChild(a);
   let tm = null;
   if (cfg.withTime) {
     const l = document.createElement("label"); l.className = "inlineLabel"; l.textContent = "Time";
@@ -493,6 +486,19 @@ function openInline(rowNode, cfg) {
     bz.value = cfg.bazar || "";
     f.append(l, bz);
   }
+  // more purchases on the same date, each with its own বাজারকর্তা
+  const extraBox = document.createElement("div");
+  if (cfg.allowExtra) {
+    const renum = () => [...extraBox.children].forEach((b, i) => { b.querySelector(".spItemTitle").textContent = "Another purchase " + (i + 1); });
+    const more = document.createElement("button"); more.type = "button"; more.textContent = "+ Add another বাজারকর্তা";
+    more.onclick = () => {
+      const b = spItemEl(), rm = b.querySelector(".spRemove");
+      b.querySelector(".spTime").value = cfg.time || nowTime();
+      rm.hidden = false; rm.onclick = () => { b.remove(); renum(); };
+      extraBox.appendChild(b); renum(); b.querySelector(".spWho").focus();
+    };
+    f.append(extraBox, more);
+  }
   const bar = document.createElement("div"); bar.className = "inlineBtns";
   const ok = document.createElement("button"); ok.textContent = "Save";
   const no = document.createElement("button"); no.type = "button"; no.textContent = "Cancel";
@@ -500,11 +506,30 @@ function openInline(rowNode, cfg) {
   bar.append(ok, no); f.appendChild(bar);
   f.onsubmit = async ev => {
     ev.preventDefault();
-    if (tm && cfg.date === nowDate() && tm.value > nowTime()) return alert("That time has not come yet.");
-    const done = await cfg.save(Number(a.value), d ? d.value : undefined, bz ? bz.value : undefined, tm ? tm.value : undefined);
+    const day = dt ? dt.value : cfg.date;
+    const extra = [...extraBox.children].map(b => ({ bazarKorta: b.querySelector(".spWho").value, time: b.querySelector(".spTime").value,
+      amount: b.querySelector(".spAmt").value, details: b.querySelector(".spDet").value.trim() }));
+    if (day && day > nowDate()) return alert("You cannot use a future date.");
+    if (day === nowDate() && ((tm && tm.value > nowTime()) || extra.some(x => x.time > nowTime()))) return alert("That time has not come yet.");
+    const done = await cfg.save(Number(a.value), d ? d.value : undefined, bz ? bz.value : undefined, tm ? tm.value : undefined, day, extra);
     if (done) { inlineOpen = false; render(); }
   };
   rowNode.appendChild(f); a.focus();
+}
+
+function depositRowEl(e, who, latestDate) {
+  const r = document.createElement("div"); r.className = "row";
+  const a = document.createElement("span"); a.appendChild(dateChip(e.date));
+  if (e.time) a.appendChild(timeChip(e.time));
+  a.append(e.pseudo ? " · sheet entry" : (e.addedByName ? " · by " + e.addedByName : ""));
+  const editable = U.admin || (who === U.name && e.date === latestDate);
+  const right = document.createElement("span"); right.className = "rowRight";
+  right.append(amountEl(fmt(e.amount)),
+    actionsEl(editable ? () => openInline(r, { title: `Edit ${who}'s fund · ${e.date}${e.time ? " " + e.time : ""}`, amount: e.amount, withDetails: false, allowNegative: !!e.pseudo,
+        save: amt => act("editDeposit", { id: e.id, date: e.date, person: who, amount: amt }) }) : null,
+      U.admin ? () => act("clearDeposit", { id: e.id, date: e.date, person: who }) : null));
+  r.append(a, right);
+  return r;
 }
 
 function renderMealHistory(name) {
