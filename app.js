@@ -172,7 +172,9 @@ function applyRole() {
   $("previewNotice").hidden = !isPreview();
   $("adminPreview").hidden = !me.admin;
   if (me.admin) buildPreviewSelect();
-  $("bookBar").hidden = !(me.admin && !previewName && books.length > 1);
+  const adminView = !!(me.admin && !previewName);
+  document.body.classList.toggle("isAdmin", adminView);      // members never get this class
+  $("bookBar").hidden = !(adminView && books.length > 1);
   $("bookSel").value = adminIdx;
   $("bookTitle").textContent = book().label;
   document.querySelectorAll(".adminOnly").forEach(el => { el.hidden = !U.admin; });
