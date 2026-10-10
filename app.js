@@ -40,37 +40,41 @@ fillNameSelect("fundWho", "— নাম নির্বাচন করুন �
 fillNameSelect("mealWho", "— নাম নির্বাচন করুন —");
 fillNameSelect("spBazarKorta", "— বাজারকর্তা নির্বাচন করুন —");
 
-// Several independent Google Sheets can be connected (each has its own Apps Script web app + Members tab).
+// Several Google Sheets are connected (each has its own Apps Script web app + Members tab).
 const isUrl = u => /^https?:\/\//.test(u || "") && !String(u).includes("PASTE_");
 const books = (Array.isArray(CFG.BOOKS) && CFG.BOOKS.length ? CFG.BOOKS : [{ id: "main", label: "খাদ্য তথ্য", url: CFG.SCRIPT_URL }]).filter(b => isUrl(b.url));
 if (!books.length) { $("setup").hidden = false; throw new Error("No sheet connected"); }
 
+// "খাদ্য তথ্য" is the source of truth: every number, history, alert and permission comes from it.
+// The other sheets are only synced copies. The Sheet view tables can show either one.
+const srcBook = books.find(b => b.id === "khaddo") || books[0];
+const otherBooks = books.filter(b => b !== srcBook);
+
 const auth = getAuth(initializeApp(firebaseConfig));
 let me = null;            // the real signed-in user (from the sheet's Members tab)
 let U = null;             // the user whose interface is shown (= me, or a member while the admin previews)
-let S = null, busy = false, poll = null, previewName = "";
+let S = null;             // data of the source sheet (everything except the Sheet view tables)
+let T = null, tblErr = ""; // data shown in the Sheet view tables
+let busy = false, poll = null, previewName = "", autoSynced = false;
 let inlineOpen = false, permDirty = false;
 const mealDirty = { lunch: false, dinner: false };
 let spBazarDirty = false;
 
-// Members always see the "bazar" sheet (বেলা হিসাব). The admin chooses with the dropdown.
-// Every write goes to ALL sheets, so they stay in sync.
+// Sheet view: members always see "বেলা হিসাব" (id "bazar"); the admin chooses with the dropdown.
 const memberIdx = Math.max(0, books.findIndex(b => b.id === "bazar"));
-let adminIdx = 0, lastLoadIdx = -1;
+let adminIdx = 0;
 try { const i = books.findIndex(b => b.id === localStorage.getItem("book")); if (i >= 0) adminIdx = i; } catch (e) { /* private mode */ }
-const showIdx = () => (me && me.admin && !previewName) ? adminIdx : memberIdx;
-const book = () => books[showIdx()];
+const tblIdx = () => (me && me.admin && !previewName) ? adminIdx : memberIdx;
 books.forEach((b, i) => { const o = document.createElement("option"); o.value = i; o.textContent = b.label; $("bookSel").appendChild(o); });
 $("bookSel").value = adminIdx;
-$("bookTitle").textContent = book().label;
+$("bookTitle").textContent = srcBook.label;
 $("bookSel").addEventListener("change", () => {
   adminIdx = Number($("bookSel").value);
   try { localStorage.setItem("book", books[adminIdx].id); } catch (e) { /* ignore */ }
-  inlineOpen = false; permDirty = false; resetMealDirty(); spBazarDirty = false;
   refresh(true);
 });
 
-// ---------- API (Google Apps Script web app on top of the sheet) ----------
+// ---------- API (Google Apps Script web app on top of each sheet) ----------
 const isPreview = () => !!(me && me.admin && previewName);
 async function call(url, action, payload, idToken) {
   const r = await fetch(url, { method: "POST", body: JSON.stringify({ action, idToken, ...payload }) });
@@ -78,17 +82,23 @@ async function call(url, action, payload, idToken) {
   if (!j.ok) throw new Error(j.error || "Request failed");
   return j;
 }
+const loadSheet = async b => call(b.url, "load", {}, await auth.currentUser.getIdToken());
+// Ask every other sheet to copy the source sheet's data into its own layout
+async function syncMirrors(idToken) {
+  idToken = idToken || await auth.currentUser.getIdToken();
+  const fails = [];
+  await Promise.all(otherBooks.map(b => call(b.url, "syncFromSource", {}, idToken)
+    .then(j => { if (j.warn) fails.push(b.label + ": " + j.warn); })
+    .catch(e => fails.push(b.label + ": " + e.message))));
+  return fails;
+}
 async function api(action, payload = {}) {
   if (action !== "load" && isPreview()) throw new Error("Preview mode: switch back to “Your admin view” to make changes.");
   const idToken = await auth.currentUser.getIdToken();
-  const primary = book();
-  if (action === "load") lastLoadIdx = showIdx();
-  const j = await call(primary.url, action, payload, idToken);
-  const mirrors = books.filter(b => b !== primary);
-  if (action !== "load" && mirrors.length) {
-    const fails = [];
-    await Promise.all(mirrors.map(m => call(m.url, action, payload, idToken).catch(e => fails.push(m.label + ": " + e.message))));
-    if (fails.length) throw new Error("Saved in " + primary.label + " but NOT in the other sheet (" + fails.join("; ") + "). Fix it there by hand and don't resubmit, or " + primary.label + " will double count.");
+  const j = await call(srcBook.url, action, payload, idToken);      // always the source sheet
+  if (action !== "load" && otherBooks.length) {
+    const fails = await syncMirrors(idToken);
+    if (fails.length) throw new Error("Saved in " + srcBook.label + ", but the other sheet is not fully updated (" + fails.join("; ") + "). Press ⟳ to sync again.");
   }
   return j;
 }
@@ -109,7 +119,13 @@ $("gBtn").onclick = async () => {
   }
 };
 $("out").onclick = $("deniedOut").onclick = () => signOut(auth);
-$("refresh").onclick = () => refresh(true);
+$("refresh").onclick = async () => {
+  if (me && me.admin && !isPreview() && otherBooks.length) {          // ⟳ also re-syncs the other sheet
+    const fails = await syncMirrors().catch(e => [e.message]);
+    if (fails.length) alert("Sync problem: " + fails.join("; "));
+  }
+  refresh(true);
+};
 
 function showLogin(msg, denied) {
   $("app").hidden = true; $("login").hidden = false;
@@ -119,8 +135,8 @@ function showLogin(msg, denied) {
 function setLive(on) { const l = $("live"); l.textContent = on ? "● live" : "● offline"; l.className = "live " + (on ? "on" : "off"); }
 
 onAuthStateChanged(auth, user => {
-  clearInterval(poll); me = null; U = null; S = null; previewName = ""; lastLoadIdx = -1; setLive(false);
-  $("bookTitle").textContent = book().label;
+  clearInterval(poll); me = null; U = null; S = null; T = null; previewName = ""; autoSynced = false; setLive(false);
+  $("bookTitle").textContent = srcBook.label;
   if (!user) return showLogin();
   $("loginMsg").textContent = "Loading…";
   refresh(true);
@@ -128,15 +144,28 @@ onAuthStateChanged(auth, user => {
 });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && auth.currentUser) refresh(); });
 
+// Sheet view tables: from the sheet chosen by tblIdx() (the source itself needs no second request)
+async function loadTables() {
+  const b = books[tblIdx()];
+  tblErr = "";
+  if (b === srcBook) { T = S; return; }
+  try { T = await loadSheet(b); }
+  catch (e) { T = null; tblErr = b.label + ": " + e.message; }
+}
+
 async function refresh(force) {
   if (busy && !force) return;
   busy = true;
   try {
-    S = await api("load"); me = S.me;
-    if (showIdx() !== lastLoadIdx) { S = await api("load"); me = S.me; }   // admin: reload from the chosen sheet
-    setLive(true);
+    S = await api("load"); me = S.me; setLive(true);
     $("login").hidden = true; $("app").hidden = false;
-    applyRole(); render(); renderAlerts(); syncMeal(); syncSpBazar();
+    applyRole();
+    await loadTables();
+    render(); renderAlerts(); syncMeal(); syncSpBazar();
+    if (me.admin && !autoSynced && otherBooks.length) {               // once per visit: bring the other sheet in line
+      autoSynced = true;
+      syncMirrors().then(f => { if (f.length) alert("Sync problem: " + f.join("; ")); });
+    }
   } catch (e) {
     if (/group list/i.test(e.message)) showLogin(e.message + ". Ask the admin to add this email.", true);
     else { setLive(false); if (!me) showLogin("Could not reach the sheet: " + e.message, true); }
@@ -161,7 +190,7 @@ $("adminPreview").addEventListener("change", () => {
   const who = previewName || me.name;
   $("fundWho").value = who; $("mealWho").value = who;
   resetMealDirty(); inlineOpen = false;
-  refresh(true);       // the preview must load the member's sheet
+  refresh(true);       // the preview shows the member's Sheet view
 });
 
 function applyRole() {
@@ -176,7 +205,7 @@ function applyRole() {
   document.body.classList.toggle("isAdmin", adminView);      // members never get this class
   $("bookBar").hidden = !(adminView && books.length > 1);
   $("bookSel").value = adminIdx;
-  $("bookTitle").textContent = book().label;
+  $("bookTitle").textContent = srcBook.label;
   document.querySelectorAll(".adminOnly").forEach(el => { el.hidden = !U.admin; });
   $("spendAddBox").hidden = !(U.admin || U.canGrocery);
   ["fundWho", "mealWho"].forEach(id => { if (!$(id).value && NAMES.includes(U.name)) $(id).value = U.name; });
@@ -428,20 +457,23 @@ function table(head, rows, total, hl) {
   if (total) { const tr = tb.insertRow(); tr.className = "total"; total.forEach(c => { tr.insertCell().textContent = c; }); }
   return t;
 }
+// Only these three tables follow the chosen sheet (T); everything else uses the source sheet (S).
 function renderTables() {
+  const ids = ["tblMeals", "tblDeposits", "tblSpending"];
+  if (!T) { ids.forEach(id => { $(id).textContent = tblErr || "Could not load this sheet"; }); return; }
   const sums = (dates, src) => NAMES.map(n => dates.reduce((t, d) => t + num(src[d][n]), 0));
   const put = (id, el) => { const b = $(id); b.textContent = ""; b.appendChild(el); };
-  put("tblMeals", table(["Tarikh", ...NAMES], S.mealDates.map(d => [d, ...NAMES.map(n => S.meals[d][n])]),
-    ["Total meal", ...sums(S.mealDates, S.meals)], todayIso));
-  put("tblDeposits", table(["Tarikh", ...NAMES], S.depDates.map(d => [d, ...NAMES.map(n => S.deposits[d][n])]),
-    ["Total", ...sums(S.depDates, S.deposits).map(fmt)], todayIso));
-  if (S.layout === "blocks" && S.bazarGrid) {
-    const dates = Object.keys(S.bazarGrid).sort();
-    put("tblSpending", table(["Tarikh", ...NAMES], dates.map(d => [d, ...NAMES.map(n => S.bazarGrid[d][n])]),
-      ["Total", ...sums(dates, S.bazarGrid).map(fmt)], todayIso));
+  put("tblMeals", table(["Tarikh", ...NAMES], T.mealDates.map(d => [d, ...NAMES.map(n => T.meals[d][n])]),
+    ["Total meal", ...sums(T.mealDates, T.meals)], todayIso));
+  put("tblDeposits", table(["Tarikh", ...NAMES], T.depDates.map(d => [d, ...NAMES.map(n => T.deposits[d][n])]),
+    ["Total", ...sums(T.depDates, T.deposits).map(fmt)], todayIso));
+  if (T.layout === "blocks" && T.bazarGrid) {
+    const dates = Object.keys(T.bazarGrid).sort();
+    put("tblSpending", table(["Tarikh", ...NAMES], dates.map(d => [d, ...NAMES.map(n => T.bazarGrid[d][n])]),
+      ["Total", ...sums(dates, T.bazarGrid).map(fmt)], todayIso));
   } else {
-    put("tblSpending", table(["Tarikh", "Spending", "Details", "বাজারকর্তা"], S.spending.map(e => [e.date, e.amount, e.details, e.bazarKorta || ""]),
-      ["Total spending", fmt(S.spending.reduce((t, e) => t + num(e.amount), 0)), "", ""], todayIso));
+    put("tblSpending", table(["Tarikh", "Spending", "Details", "বাজারকর্তা"], T.spending.map(e => [e.date, e.amount, e.details, e.bazarKorta || ""]),
+      ["Total spending", fmt(T.spending.reduce((t, e) => t + num(e.amount), 0)), "", ""], todayIso));
   }
 }
 
