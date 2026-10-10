@@ -2,7 +2,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import {
   getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, SCRIPT_URL } from "./firebase-config.js";
+import * as CFG from "./firebase-config.js";
+const firebaseConfig = CFG.firebaseConfig;
 
 const $ = id => document.getElementById(id);
 const NAMES = ["Shohan", "Naved", "Salman", "Rifat", "Shihab", "Ashmit"];
@@ -30,23 +31,36 @@ function fillNameSelect(id, blankLabel, exclude) {
 }
 fillNameSelect("fundWho", "— নাম নির্বাচন করুন —");
 fillNameSelect("mealWho", "— নাম নির্বাচন করুন —");
-fillNameSelect("mealBazar", "— বাজারকর্তা নির্বাচন করুন —");
+fillNameSelect("spBazarKorta", "— বাজারকর্তা নির্বাচন করুন —");
 
-if (SCRIPT_URL.startsWith("PASTE_")) { $("setup").hidden = false; throw new Error("SCRIPT_URL not set"); }
+// Several independent Google Sheets can be connected (each has its own Apps Script web app + Members tab).
+const isUrl = u => /^https?:\/\//.test(u || "") && !String(u).includes("PASTE_");
+const books = (Array.isArray(CFG.BOOKS) && CFG.BOOKS.length ? CFG.BOOKS : [{ id: "main", label: "খাদ্য তথ্য", url: CFG.SCRIPT_URL }]).filter(b => isUrl(b.url));
+if (!books.length) { $("setup").hidden = false; throw new Error("No sheet connected"); }
+let bookIdx = 0;
+try { const i = books.findIndex(b => b.id === localStorage.getItem("book")); if (i >= 0) bookIdx = i; } catch (e) { /* private mode */ }
+const book = () => books[bookIdx];
+$("bookTitle").textContent = book().label;
+if (books.length > 1) {
+  $("bookBar").hidden = false;
+  books.forEach((b, i) => { const o = document.createElement("option"); o.value = i; o.textContent = b.label; $("bookSel").appendChild(o); });
+  $("bookSel").value = bookIdx;
+}
 
 const auth = getAuth(initializeApp(firebaseConfig));
 let me = null;            // the real signed-in user (from the sheet's Members tab)
 let U = null;             // the user whose interface is shown (= me, or a member while the admin previews)
 let S = null, busy = false, poll = null, previewName = "";
 let inlineOpen = false, permDirty = false;
-const mealDirty = { lunch: false, dinner: false, bazar: false };
+const mealDirty = { lunch: false, dinner: false };
+let spBazarDirty = false;
 
 // ---------- API (Google Apps Script web app on top of the sheet) ----------
 const isPreview = () => !!(me && me.admin && previewName);
 async function api(action, payload = {}) {
   if (action !== "load" && isPreview()) throw new Error("Preview mode: switch back to “Your admin view” to make changes.");
   const idToken = await auth.currentUser.getIdToken();
-  const r = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify({ action, idToken, ...payload }) });
+  const r = await fetch(book().url, { method: "POST", body: JSON.stringify({ action, idToken, ...payload }) });
   const j = await r.json();
   if (!j.ok) throw new Error(j.error || "Request failed");
   return j;
@@ -70,6 +84,18 @@ $("gBtn").onclick = async () => {
 $("out").onclick = $("deniedOut").onclick = () => signOut(auth);
 $("refresh").onclick = () => refresh(true);
 
+$("bookSel").addEventListener("change", () => {
+  bookIdx = Number($("bookSel").value);
+  try { localStorage.setItem("book", book().id); } catch (e) { /* ignore */ }
+  $("bookTitle").textContent = book().label;
+  me = null; U = null; S = null; previewName = ""; inlineOpen = false; permDirty = false; resetMealDirty(); spBazarDirty = false;
+  ["fundWho", "mealWho"].forEach(id => { $(id).value = ""; });
+  setLive(false);
+  if (!auth.currentUser) return showLogin();
+  showLogin("Loading " + book().label + "…", true); $("deniedOut").hidden = true;
+  refresh(true);
+});
+
 function showLogin(msg, denied) {
   $("app").hidden = true; $("login").hidden = false;
   $("loginMsg").textContent = msg || "Sign in with the Google account the admin added for you.";
@@ -92,7 +118,7 @@ async function refresh(force) {
   try {
     S = await api("load"); me = S.me; setLive(true);
     $("login").hidden = true; $("app").hidden = false;
-    applyRole(); render(); renderAlerts(); syncMeal();
+    applyRole(); render(); renderAlerts(); syncMeal(); syncSpBazar();
   } catch (e) {
     if (/group list/i.test(e.message)) showLogin(e.message + ". Ask the admin to add this email.", true);
     else { setLive(false); if (!me) showLogin("Could not reach the sheet: " + e.message, true); }
@@ -102,7 +128,7 @@ async function refresh(force) {
 // ---------- Who is the interface for (admin preview) ----------
 function effectiveMember() {
   const m = (S.members || []).find(x => x.name === previewName);
-  return m || { name: previewName, email: "", admin: false, addFor: [], canGrocery: false, canFunds: false, canMeals: false };
+  return m || { name: previewName, email: "", admin: false, addFor: [], fundsFor: [], mealsFor: [], canGrocery: false, canFunds: false, canMeals: false };
 }
 function buildPreviewSelect() {
   const sel = $("adminPreview");
@@ -117,7 +143,7 @@ $("adminPreview").addEventListener("change", () => {
   const who = previewName || me.name;
   $("fundWho").value = who; $("mealWho").value = who;
   resetMealDirty(); inlineOpen = false;
-  applyRole(); render(); renderAlerts(); syncMeal();
+  applyRole(); render(); renderAlerts(); syncMeal(); syncSpBazar();
 });
 
 function applyRole() {
@@ -170,6 +196,10 @@ function statsFor(S, name, email) {
 const balanceOf = n => { const s = statsFor(S, n); return { dep: s.dep, share: s.spendShare, bal: s.balSpend }; };
 const monthSpent = () => statsFor(S, NAMES[0]).monthSpent;
 
+function setSelectValue(sel, v) {
+  if (v && ![...sel.options].some(o => o.value === v)) { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); }
+  sel.value = v || "";
+}
 const dateChip = d => { const b = document.createElement("b"); b.className = "sp-date"; b.textContent = d; return b; };
 
 // ---------- Rendering ----------
@@ -204,7 +234,7 @@ function render() {
   if (lastBazar) {
     ld.appendChild(dateChip(lastBazar.date));
     const det = lastBazar.details && lastBazar.details !== "N/A" ? lastBazar.details : "";
-    const baz = (S.bazar || {})[lastBazar.date];
+    const baz = lastBazar.bazarKorta;
     if (det) ld.append(" · " + det);
     if (baz) ld.append(" · বাজারকর্তা: " + baz);
   }
@@ -221,12 +251,12 @@ const latestSpendingDate = () => {
   return l || "";
 };
 const canEditSpending = e => U.admin || !!(U.canGrocery && e.date === latestSpendingDate() && e.addedByEmail && e.addedByEmail === U.email);
-const canFundFor = who => !!(who && (U.admin || (U.canFunds && (U.addFor || []).includes(who))));
+const canFundFor = who => !!(who && (U.admin || (U.fundsFor || []).includes(who)));
 
 function renderHistories() {
   // grocery history (all dates, from the Grocery Spending table)
   const sl = $("spList"); sl.textContent = "";
-  const sp = S.spending.filter(e => num(e.amount) > 0).sort((a, b) => b.date.localeCompare(a.date));
+  const sp = S.spending.filter(e => num(e.amount) > 0).sort((a, b) => b.date.localeCompare(a.date) || NAMES.indexOf(a.bazarKorta) - NAMES.indexOf(b.bazarKorta));
   if (!sp.length) sl.textContent = "No spending yet";
   sp.forEach(e => sl.appendChild(spendingRowEl(e)));
 
@@ -259,14 +289,14 @@ function spendingRowEl(e) {
   const r = document.createElement("div"); r.className = "row spendingRow";
   const a = document.createElement("span"); a.className = "spendingDescription";
   a.appendChild(dateChip(e.date));
-  const det = e.details && e.details !== "N/A" ? e.details : "", baz = (S.bazar || {})[e.date];
+  const det = e.details && e.details !== "N/A" ? e.details : "", baz = e.bazarKorta || "";
   if (det) a.append(" · " + det);
   if (baz) a.append(" · বাজারকর্তা: " + baz);
   const right = document.createElement("span"); right.className = "rowRight";
   right.append(amountEl(fmt(num(e.amount))),
-    actionsEl(canEditSpending(e) ? () => openInline(r, { title: `Edit grocery · ${e.date}`, amount: e.amount, details: det, withDetails: true,
-        save: (amount, details) => act("editSpending", { date: e.date, amount, details }) }) : null,
-      U.admin ? () => act("clearSpending", { date: e.date }) : null));
+    actionsEl(canEditSpending(e) ? () => openInline(r, { title: `Edit grocery · ${e.date}`, amount: e.amount, details: det, withDetails: true, withBazar: true, bazar: baz || "", lockBazar: S.layout === "blocks",
+        save: (amount, details, bazarKorta) => act("editSpending", { date: e.date, person: baz, amount, details, bazarKorta }) }) : null,
+      U.admin ? () => act("clearSpending", { date: e.date, person: baz }) : null));
   r.append(a, right);
   return r;
 }
@@ -294,6 +324,15 @@ function openInline(rowNode, cfg) {
   f.append(t, a);
   let d = null;
   if (cfg.withDetails) { d = document.createElement("textarea"); d.rows = 4; d.value = cfg.details || ""; d.placeholder = "Details"; f.appendChild(d); }
+  let bz = null;
+  if (cfg.withBazar) {
+    const l = document.createElement("label"); l.className = "inlineLabel"; l.textContent = "বাজারকর্তা";
+    bz = document.createElement("select");
+    [["", "— বাজারকর্তা নির্বাচন করুন —"], ...NAMES.map(n => [n, n])].forEach(([v, t]) => { const o = document.createElement("option"); o.value = v; o.textContent = t; bz.appendChild(o); });
+    setSelectValue(bz, cfg.bazar || "");
+    bz.disabled = !!cfg.lockBazar || (!U.admin && !!cfg.bazar);   // new sheet: the amount sits in that person's cell, so it is fixed. Old sheet: non-admins can only fill it while empty
+    f.append(l, bz);
+  }
   const bar = document.createElement("div"); bar.className = "inlineBtns";
   const ok = document.createElement("button"); ok.textContent = "Save";
   const no = document.createElement("button"); no.type = "button"; no.textContent = "Cancel";
@@ -301,7 +340,7 @@ function openInline(rowNode, cfg) {
   bar.append(ok, no); f.appendChild(bar);
   f.onsubmit = async ev => {
     ev.preventDefault();
-    const done = await cfg.save(Number(a.value), d ? d.value : undefined);
+    const done = await cfg.save(Number(a.value), d ? d.value : undefined, bz ? bz.value : undefined);
     if (done) { inlineOpen = false; render(); }
   };
   rowNode.appendChild(f); a.focus();
@@ -313,7 +352,7 @@ function renderMealHistory(name) {
   S.mealDates.forEach(d => {
     const cell = S.meals[d][name], has = cell !== "" && cell != null && cell !== "N/A";
     const n = (S.mealNotes || {})[name + "|" + d];
-    if (has || (n && (n.lunch || n.dinner))) rows.push({ date: d, count: has ? cell : "", lunch: n && n.lunch, dinner: n && n.dinner, bazar: (S.bazar || {})[d] || "" });
+    if (has || (n && (n.lunch || n.dinner))) rows.push({ date: d, count: has ? cell : "", lunch: n && n.lunch, dinner: n && n.dinner });
   });
   rows.sort((a, b) => b.date.localeCompare(a.date));
   if (!rows.length) { box.textContent = "No meal entries yet"; return; }
@@ -322,7 +361,6 @@ function renderMealHistory(name) {
     const a = document.createElement("span"); a.className = "spendingDescription"; a.appendChild(dateChip(e.date));
     const parts = [];
     if (e.lunch || e.dinner) parts.push(`দুপুর: ${e.lunch || "—"} · রাত: ${e.dinner || "—"}`);
-    if (e.bazar) parts.push(`বাজারকর্তা: ${e.bazar}`);
     if (parts.length) a.append(" · " + parts.join(" · "));
     r.append(a, e.count !== "" ? amountEl(`${e.count} meal${num(e.count) === 1 ? "" : "s"}`) : document.createElement("span"));
     box.appendChild(r);
@@ -344,12 +382,18 @@ function table(head, rows, total, hl) {
 function renderTables() {
   const sums = (dates, src) => NAMES.map(n => dates.reduce((t, d) => t + num(src[d][n]), 0));
   const put = (id, el) => { const b = $(id); b.textContent = ""; b.appendChild(el); };
-  put("tblMeals", table(["Tarikh", ...NAMES, "বাজারকর্তা"], S.mealDates.map(d => [d, ...NAMES.map(n => S.meals[d][n]), (S.bazar || {})[d] || ""]),
-    ["Total meal", ...sums(S.mealDates, S.meals), ""], todayIso));
+  put("tblMeals", table(["Tarikh", ...NAMES], S.mealDates.map(d => [d, ...NAMES.map(n => S.meals[d][n])]),
+    ["Total meal", ...sums(S.mealDates, S.meals)], todayIso));
   put("tblDeposits", table(["Tarikh", ...NAMES], S.depDates.map(d => [d, ...NAMES.map(n => S.deposits[d][n])]),
     ["Total", ...sums(S.depDates, S.deposits).map(fmt)], todayIso));
-  put("tblSpending", table(["Tarikh", "Spending", "Details"], S.spending.map(e => [e.date, e.amount, e.details]),
-    ["Total spending", fmt(S.spending.reduce((t, e) => t + num(e.amount), 0)), ""], todayIso));
+  if (S.layout === "blocks" && S.bazarGrid) {
+    const dates = Object.keys(S.bazarGrid).sort();
+    put("tblSpending", table(["Tarikh", ...NAMES], dates.map(d => [d, ...NAMES.map(n => S.bazarGrid[d][n])]),
+      ["Total", ...sums(dates, S.bazarGrid).map(fmt)], todayIso));
+  } else {
+    put("tblSpending", table(["Tarikh", "Spending", "Details", "বাজারকর্তা"], S.spending.map(e => [e.date, e.amount, e.details, e.bazarKorta || ""]),
+      ["Total spending", fmt(S.spending.reduce((t, e) => t + num(e.amount), 0)), "", ""], todayIso));
+  }
 }
 
 // ---------- Admin: members + permissions ----------
@@ -372,6 +416,7 @@ function renderMembers() {
     box.appendChild(row);
   });
 }
+let permDraft = {}, permTarget = "";
 function renderPermissionEditor() {
   const sel = $("permPerson"), keep = sel.value;
   sel.textContent = "";
@@ -386,31 +431,64 @@ function syncPermissionEditor() {
   const name = $("permPerson").value, u = (S.members || []).find(x => x.name === name);
   $("permEditor").hidden = !u;
   if (!u) return;
-  $("permGrocery").checked = !!u.canGrocery; $("permFunds").checked = !!u.canFunds; $("permMeals").checked = !!u.canMeals;
-  const box = $("permWho"); box.textContent = "";
-  NAMES.filter(n => n !== name).forEach(n => {
-    const l = document.createElement("label"); l.className = "chip";
-    const cb = document.createElement("input"); cb.type = "checkbox"; cb.value = n; cb.checked = (u.addFor || []).includes(n);
-    l.append(cb, " " + n); box.appendChild(l);
-  });
+  permDraft = {};
+  NAMES.filter(n => n !== name).forEach(n => { permDraft[n] = { funds: (u.fundsFor || []).includes(n), meals: (u.mealsFor || []).includes(n) }; });
+  $("permGrocery").checked = !!u.canGrocery;
+  permTarget = "";
+  drawPermWho(); drawPermTarget();
 }
+const permLabel = p => [p.funds ? "Funds" : "", p.meals ? "Meal details" : ""].filter(Boolean).join(" + ");
+function drawPermWho() {                       // "Select who's": pick a person to set what this member may add for them
+  const box = $("permWho"); box.textContent = "";
+  Object.keys(permDraft).forEach(n => {
+    const b = document.createElement("button"); b.type = "button";
+    b.className = "whoBtn" + (n === permTarget ? " on" : "") + (permDraft[n].funds || permDraft[n].meals ? " has" : "");
+    b.textContent = n + (permDraft[n].funds || permDraft[n].meals ? " ✓" : "");
+    b.onclick = () => { permTarget = n; permDirty = true; drawPermWho(); drawPermTarget(); };
+    box.appendChild(b);
+  });
+  const lines = Object.keys(permDraft).filter(n => permDraft[n].funds || permDraft[n].meals).map(n => `${n}: ${permLabel(permDraft[n])}`);
+  $("permSummary").textContent = lines.length ? "Can add for → " + lines.join(" · ") : "No add-on-behalf permissions yet";
+}
+function drawPermTarget() {                    // that person's permissions appear after selecting them
+  $("permTargetBox").hidden = !permTarget;
+  if (!permTarget) return;
+  $("permTargetTitle").textContent = `Permissions for ${permTarget}`;
+  $("permTFunds").checked = permDraft[permTarget].funds;
+  $("permTMeals").checked = permDraft[permTarget].meals;
+}
+["permTFunds", "permTMeals"].forEach(id => $(id).addEventListener("change", () => {
+  if (!permTarget) return;
+  permDraft[permTarget] = { funds: $("permTFunds").checked, meals: $("permTMeals").checked };
+  permDirty = true; drawPermWho();
+}));
+$("permGrocery").addEventListener("change", () => { permDirty = true; });
 $("permPerson").addEventListener("change", () => { permDirty = false; syncPermissionEditor(); });
-$("permEditor").addEventListener("change", () => { permDirty = true; });     // unsaved ticks are never overwritten by the 15 s refresh
 $("savePerms").addEventListener("click", async () => {
   const name = $("permPerson").value, u = (S.members || []).find(x => x.name === name);
   if (!u) return;
   const ok = await act("savePerms", {
-    email: u.email, addFor: [...$("permWho").querySelectorAll("input:checked")].map(x => x.value),
-    canGrocery: $("permGrocery").checked, canFunds: $("permFunds").checked, canMeals: $("permMeals").checked });
+    email: u.email, canGrocery: $("permGrocery").checked,
+    fundsFor: Object.keys(permDraft).filter(n => permDraft[n].funds), mealsFor: Object.keys(permDraft).filter(n => permDraft[n].meals) });
   if (ok) { permDirty = false; syncPermissionEditor(); }
 });
 
 // ---------- Forms ----------
 $("spForm").addEventListener("submit", async e => {
   e.preventDefault();
-  const ok = await act("addSpending", { date: $("spDate").value, amount: $("spAmt").value, details: $("spDet").value.trim() });
-  if (ok) { $("spAmt").value = ""; $("spDet").value = ""; }
+  const ok = await act("addSpending", { date: $("spDate").value, amount: $("spAmt").value, details: $("spDet").value.trim(), bazarKorta: $("spBazarKorta").value });
+  if (ok) { $("spAmt").value = ""; $("spDet").value = ""; spBazarDirty = false; syncSpBazar(); }
 });
+// বাজারকর্তা is one person per date: pre-fill it from the sheet, and lock it for non-admins once set
+function syncSpBazar() {
+  if (!S) return;
+  if (S.layout === "blocks") { $("spBazarKorta").disabled = false; return; }   // new sheet: several people can shop on one date
+  const ex = (S.bazar || {})[$("spDate").value] || "";
+  if (!spBazarDirty) setSelectValue($("spBazarKorta"), ex);
+  $("spBazarKorta").disabled = !U.admin && !!ex;
+}
+$("spBazarKorta").addEventListener("change", () => { spBazarDirty = true; });
+$("spDate").addEventListener("change", () => { spBazarDirty = false; syncSpBazar(); });
 $("depForm").addEventListener("submit", async e => {
   e.preventDefault();
   const ok = await act("addDeposit", { date: $("depDate").value, person: $("fundWho").value, amount: $("depAmt").value });
@@ -421,20 +499,19 @@ $("fundWho").addEventListener("change", () => { inlineOpen = false; render(); })
 // ---------- Meal details: lunch / dinner / বাজারকর্তা ----------
 // Sheet cell = number of meals (a filled box counts 1, or the number typed); the text is kept in the MealDetails tab.
 const noteKey = () => `${$("mealWho").value}|${$("mealDate").value}`;
-const resetMealDirty = () => { mealDirty.lunch = mealDirty.dinner = mealDirty.bazar = false; };
+const resetMealDirty = () => { mealDirty.lunch = mealDirty.dinner = false; };
 // full = admin or own meals (auto-save). add = permitted person adding for someone else (fill empty boxes, press Save).
 function mealMode() {
   const who = $("mealWho").value, date = $("mealDate").value;
   if (!U || !S || !who || !S.mealDates.includes(date)) return null;
   if (U.admin || who === U.name) return "full";
-  if (U.canMeals && (U.addFor || []).includes(who)) return "add";
+  if ((U.mealsFor || []).includes(who)) return "add";
   return null;
 }
 function setEditable() {
   const mode = mealMode(), who = $("mealWho").value, date = $("mealDate").value;
   if (!S) return;
   const n = (S.mealNotes || {})[`${who}|${date}`] || { lunch: "", dinner: "" };
-  const exBazar = (S.bazar || {})[date] || "";
   let roL = true, roD = true;
   if (mode === "full") { roL = false; roD = false; }
   else if (mode === "add") {
@@ -442,9 +519,8 @@ function setEditable() {
     const locked = cell !== "" && cell != null && cell !== "N/A" && !n.lunch && !n.dinner;
     roL = locked || !!n.lunch; roD = locked || !!n.dinner;
   }
-  const bazarOk = !!mode && (U.admin || !exBazar);       // non-admins can only fill it while empty
-  $("lunch").readOnly = roL; $("dinner").readOnly = roD; $("mealBazar").disabled = !bazarOk;
-  $("mealSave").hidden = !(mode === "add" && (!roL || !roD || bazarOk));
+  $("lunch").readOnly = roL; $("dinner").readOnly = roD;
+  $("mealSave").hidden = !(mode === "add" && (!roL || !roD));
   $("status").textContent = !who ? ""
     : !S.mealDates.includes(date) ? "This date is not in the sheet"
     : mode === "add" ? "Add-only: fill an empty box and press Save. Saved entries can only be changed by the admin."
@@ -456,17 +532,12 @@ function syncMeal() {
   const n = (S.mealNotes || {})[noteKey()] || { lunch: "", dinner: "" };
   if (!mealDirty.lunch && document.activeElement !== $("lunch")) $("lunch").value = n.lunch;
   if (!mealDirty.dinner && document.activeElement !== $("dinner")) $("dinner").value = n.dinner;
-  if (!mealDirty.bazar) {
-    const v = (S.bazar || {})[$("mealDate").value] || "", sel = $("mealBazar");
-    if (v && ![...sel.options].some(o => o.value === v)) { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); }
-    sel.value = v;
-  }
   setEditable();
 }
 async function sendMeal() {
   $("status").textContent = "Saving…";
   try {
-    await api("setMeal", { person: $("mealWho").value, date: $("mealDate").value, lunch: $("lunch").value, dinner: $("dinner").value, bazar: $("mealBazar").value });
+    await api("setMeal", { person: $("mealWho").value, date: $("mealDate").value, lunch: $("lunch").value, dinner: $("dinner").value });
     resetMealDirty();
     $("status").textContent = "Saved to sheet ✓";
     refresh(true);
@@ -480,8 +551,7 @@ function autoSaveMeal() {                      // auto-save (full mode only)
 }
 $("mealSave").onclick = () => { if (mealMode() === "add") sendMeal(); };
 ["lunch", "dinner"].forEach(k => $(k).addEventListener("input", () => { mealDirty[k] = true; autoSaveMeal(); }));
-$("mealBazar").addEventListener("change", () => { mealDirty.bazar = true; autoSaveMeal(); });
-const clearMealFields = () => { resetMealDirty(); $("lunch").value = ""; $("dinner").value = ""; $("mealBazar").value = ""; };
+const clearMealFields = () => { resetMealDirty(); $("lunch").value = ""; $("dinner").value = ""; };
 $("mealWho").addEventListener("change", () => { clearMealFields(); render(); syncMeal(); });
 $("mealDate").addEventListener("change", () => { clearMealFields(); syncMeal(); });
 
@@ -526,10 +596,10 @@ function buildReport(parts) {
     R.appendChild(rTable(["Name", "Deposit", "Residual in fund", "Due in fund", "Residual in spending", "Due in spending"], rows));
   }
   if (parts.includes("bazar")) {
-    const sp = S.spending.filter(e => num(e.amount) > 0).sort((x, y) => x.date.localeCompare(y.date));
+    const sp = S.spending.filter(e => num(e.amount) > 0).sort((x, y) => x.date.localeCompare(y.date) || NAMES.indexOf(x.bazarKorta) - NAMES.indexOf(y.bazarKorta));
     add("rp-h2", "Bazar data");
     if (sp.length) R.appendChild(rTable(["Date", "Amount", "Details", "বাজারকর্তা"],
-      sp.map(e => [e.date, fmt(num(e.amount)), e.details === "N/A" ? "" : e.details, (S.bazar || {})[e.date] || ""]),
+      sp.map(e => [e.date, fmt(num(e.amount)), e.details === "N/A" ? "" : e.details, e.bazarKorta || ""]),
       ["Total", fmt(sp.reduce((t, e) => t + num(e.amount), 0)), "", ""]));
     else add("rp-note", "No bazar entries yet");
   }
