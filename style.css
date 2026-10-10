@@ -268,3 +268,50 @@ main{padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env
 @media(min-width:1400px){
   main{max-width:1240px}
 }
+
+/* ---- Print bar (top of the dashboard) ---- */
+.printBar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px;padding:10px 12px}
+.printLabel{flex:1 1 100%;font-size:.8rem;color:#9a9a9a;font-family:"Exo 2",sans-serif}
+.printBar button{flex:1 1 auto;min-height:38px}
+
+/* ---- Three distinguished sections: Grocery / Meal / Fund ---- */
+.sections{display:grid;grid-template-columns:1fr;gap:16px;margin-top:18px;align-items:start}
+.sec{--ac:#05f072;padding:12px;border:2px solid var(--ac);border-radius:10px;background:#0a0a0a}
+.secGrocery{--ac:#ff6b02}
+.secMeal{--ac:#02b0fa}
+.secFund{--ac:#05f072}
+.secTitle{margin:0 0 12px;padding:7px 10px;text-align:center;color:#000;background:var(--ac);border-radius:6px;font-family:"Exo 2",sans-serif;font-size:1.05rem;font-weight:700;letter-spacing:.04em}
+.sec .card{border-color:var(--ac);margin-bottom:10px}
+.sec .card:last-child{margin-bottom:0}
+.sec summary{color:var(--ac)}
+.sec select,.sec input,.sec .form textarea{border-color:var(--ac)}
+.sec .sp-date,.sec .row b.sp-date{background:var(--ac);border-color:var(--ac)}
+.sec .row{background:#ffffff0d}
+.sec .row b.amt{color:var(--ac)}
+.sec th{color:var(--ac)}
+.sec table{border-color:var(--ac)}
+.secTitle .alertDot{background:#ff0000;color:#fff;border:1px solid #fff}
+.formLabel{display:block;color:#9a9a9a;font-size:.85rem;margin:2px 0 -2px}
+.inlineLabel{display:block;color:#9a9a9a;font-size:.85rem}
+
+/* ---- Member permissions: pick a person, then set what is allowed for them ---- */
+.whoList{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.whoBtn{padding:8px 12px;border:1px solid #2b6b2b;background:#1f1e1c;color:#fff;border-radius:16px;min-height:36px}
+.whoBtn.has{border-color:#05f072;color:#05f072}
+.whoBtn.on{background:#016e30;color:#fff;border-color:#09ff00;box-shadow:0 0 8px #09ff00}
+#permSummary{margin-top:4px}
+
+@media(min-width:900px){
+  .sections{grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:18px}
+  .printBar{flex-wrap:nowrap}
+  .printLabel{flex:0 0 auto;margin-right:6px}
+}
+@media(max-width:600px){
+  .sec{padding:8px}
+  .printBar button{flex:1 1 45%}
+}
+
+/* ---- Sheet switcher (several spreadsheets side by side) ---- */
+.bookBar{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 12px;font-family:"Exo 2",sans-serif}
+.bookBar label{color:#9a9a9a;font-size:.85rem}
+.bookBar select{width:auto;min-width:180px;margin:0;border-color:#09ff00;font-weight:600}
