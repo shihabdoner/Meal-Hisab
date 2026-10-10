@@ -399,3 +399,45 @@ body.isMember .sec.open .secBody{grid-template-rows:1fr}
 body.isMember .secInner{min-height:0;overflow:hidden;padding-top:0;visibility:hidden;transition:padding .35s ease,visibility 0s .35s}
 body.isMember .sec.open .secInner{padding-top:12px;visibility:visible;transition:padding .35s ease,visibility 0s}
 @media(prefers-reduced-motion:reduce){body.isMember .secBody,body.isMember .secInner{transition:none}}
+
+/* =====================================================
+   MEAL TAB (members only): color-shifting animation + background
+   ===================================================== */
+@keyframes mealBorderShift{
+  0%,25%{border-color:#26ff00}
+  50%,100%{border-color:#0000ff}
+}
+@keyframes mealTextShift{
+  0%,25%{color:#26ff00}
+  50%,100%{color:#0000ff}
+}
+
+/* inner background of the Meal tab */
+body.isMember .secMeal{background:#242438}
+body.isMember .secMeal .card{background:#242438;border-color:#3a3a5c}
+body.isMember .secMeal select,
+body.isMember .secMeal input{background:#1b1b2c;border-color:#3a3a5c;color:#e2e2f0}
+body.isMember .secMeal .row{background:#2b2b45;border-color:#44446a;color:#e2e2f0}
+body.isMember .secMeal table{background:#242438}
+body.isMember .secMeal th{background:#2b2b45}
+body.isMember .secMeal textarea{color:#e2e2f0}
+body.isMember .secMeal textarea[readonly]{background:#1d1d2e}
+
+/* animated: section border, meal box, meal counts */
+body.isMember .secMeal{
+  animation:mealBorderShift 8s ease-in-out infinite alternate;
+}
+body.isMember .secMeal table,
+body.isMember .secMeal th,
+body.isMember .secMeal td{
+  border-color:#26ff00;
+  animation:mealBorderShift 8s ease-in-out infinite alternate;
+}
+body.isMember .secMeal textarea:focus{outline-color:#26ff00;animation:none}
+body.isMember .secMeal .mealHistoryRow b.amt{
+  animation:mealTextShift 8s ease-in-out infinite alternate;
+}
+@media(prefers-reduced-motion:reduce){
+  body.isMember .secMeal,body.isMember .secMeal table,body.isMember .secMeal th,
+  body.isMember .secMeal td,body.isMember .secMeal .mealHistoryRow b.amt{animation:none}
+}
