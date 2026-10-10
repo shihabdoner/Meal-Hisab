@@ -401,18 +401,22 @@ body.isMember .sec.open .secInner{padding-top:12px;visibility:visible;transition
 @media(prefers-reduced-motion:reduce){body.isMember .secBody,body.isMember .secInner{transition:none}}
 
 /* =====================================================
-   MEAL TAB (members only): color-shifting animation + background
+   MEAL TAB (members only): color animation + background
    ===================================================== */
-@keyframes mealBorderShift{
+@keyframes mealBorder{
   0%,25%{border-color:#26ff00}
-  50%,100%{border-color:#0000ff}
+  50%,75%,100%{border-color:#0000ff}
 }
-@keyframes mealTextShift{
+@keyframes mealText{
   0%,25%{color:#26ff00}
-  50%,100%{color:#0000ff}
+  50%,75%,100%{color:#0000ff}
+}
+@keyframes mealBar{
+  0%,25%{background-color:#26ff00;border-color:#26ff00;color:#000}
+  50%,75%,100%{background-color:#0000ff;border-color:#0000ff;color:#fff}
 }
 
-/* inner background of the Meal tab */
+/* inner background */
 body.isMember .secMeal{background:#242438}
 body.isMember .secMeal .card{background:#242438;border-color:#3a3a5c}
 body.isMember .secMeal select,
@@ -423,21 +427,28 @@ body.isMember .secMeal th{background:#2b2b45}
 body.isMember .secMeal textarea{color:#e2e2f0}
 body.isMember .secMeal textarea[readonly]{background:#1d1d2e}
 
-/* animated: section border, meal box, meal counts */
-body.isMember .secMeal{
-  animation:mealBorderShift 8s ease-in-out infinite alternate;
-}
+/* animated parts: all use the same 4s timing so they stay in sync */
+body.isMember .secMeal,
 body.isMember .secMeal table,
 body.isMember .secMeal th,
 body.isMember .secMeal td{
   border-color:#26ff00;
-  animation:mealBorderShift 8s ease-in-out infinite alternate;
+  animation:mealBorder 4s ease-in-out infinite alternate;
+}
+body.isMember .secMeal .secTitle{
+  animation:mealBar 4s ease-in-out infinite alternate;
+}
+body.isMember .secMeal th,
+body.isMember .secMeal .mealHistoryRow b.amt{
+  animation:mealText 4s ease-in-out infinite alternate;
+}
+body.isMember .secMeal th{
+  animation:mealBorder 4s ease-in-out infinite alternate, mealText 4s ease-in-out infinite alternate;
 }
 body.isMember .secMeal textarea:focus{outline-color:#26ff00;animation:none}
-body.isMember .secMeal .mealHistoryRow b.amt{
-  animation:mealTextShift 8s ease-in-out infinite alternate;
-}
+
 @media(prefers-reduced-motion:reduce){
-  body.isMember .secMeal,body.isMember .secMeal table,body.isMember .secMeal th,
-  body.isMember .secMeal td,body.isMember .secMeal .mealHistoryRow b.amt{animation:none}
+  body.isMember .secMeal,body.isMember .secMeal .secTitle,body.isMember .secMeal table,
+  body.isMember .secMeal th,body.isMember .secMeal td,
+  body.isMember .secMeal .mealHistoryRow b.amt{animation:none}
 }
