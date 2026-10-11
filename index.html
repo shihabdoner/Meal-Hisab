@@ -2,6 +2,22 @@
 <html lang="bn">
 <head>
 <meta charset="utf-8">
+<script>
+(function () {
+  function show(msg) {
+    var d = document.createElement("div");
+    d.style.cssText = "position:fixed;z-index:99999;left:0;right:0;bottom:0;background:#900;color:#fff;padding:8px;font:12px monospace;white-space:pre-wrap";
+    d.textContent = msg;
+    document.documentElement.appendChild(d);
+  }
+  window.addEventListener("error", function (e) {
+    show((e.message || "error") + " @ " + String(e.filename || "").split("/").pop() + ":" + (e.lineno || ""));
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    show("Promise: " + (e.reason && e.reason.message || e.reason));
+  });
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <title>খাদ্য তথ্য</title>
