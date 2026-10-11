@@ -8,11 +8,15 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Cascadia+Code:ital,wght@0,200..700;1,200..700&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,100..900;1,100..900&family=Merienda:wght@300..900&display=swap" rel="stylesheet">
-<script>document.write('<link rel="stylesheet" href="style.css?v=' + Date.now() + '">')</script>
-
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
+<link href="https://fonts.googleapis.com/css2?family=Cascadia+Code:ital,wght@0,200..700;1,200..700&family=Exo+2:ital,wght@0,100..900;1,100..900&family=Merienda:wght@300..900&family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=20261011a">
+<link rel="modulepreload" href="app.js?v=20261011a">
+<link rel="modulepreload" href="firebase-config.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
 </head>
 <body>
 <main>
@@ -27,6 +31,7 @@
     <p id="loginMsg" class="muted">Sign in with the Google account the admin added for you.</p>
     <button id="gBtn">Sign in with Google</button>
     <button id="deniedOut" hidden>Sign out</button>
+    <button id="retryBtn" hidden>Retry</button>
   </section>
 
   <!-- App (signed-in members only) -->
@@ -179,13 +184,19 @@
     </section>
   </div>
 </main>
+<div id="loadStatus" class="srOnly" role="status" aria-live="polite"></div>
+<div id="bootError" class="notice" hidden>The app could not start. Check your connection and reload the page.</div>
+<div id="boot" class="boot" aria-hidden="true">
+  <div class="skel skel-bar"></div>
+  <div class="grid">
+    <div class="skel skel-card wide"></div>
+    <div class="skel skel-card"></div><div class="skel skel-card"></div>
+    <div class="skel skel-card"></div><div class="skel skel-card"></div>
+  </div>
+  <div class="skel skel-section"></div>
+</div>
 <div id="report"></div>
-<script>
-  const s = document.createElement("script");
-  s.type = "module";
-  s.src = "app.js?v=" + Date.now();
-  document.body.appendChild(s);
-</script>
-
+<script type="module" src="app.js?v=20261011a"
+  onerror="document.getElementById('boot').hidden=true;document.getElementById('bootError').hidden=false"></script>
 </body>
 </html>
