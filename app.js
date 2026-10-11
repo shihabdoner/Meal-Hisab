@@ -121,33 +121,22 @@ $("bookSel").addEventListener("change", () => {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function call(url, action, payload, idToken) {
   const t0 = performance.now();
-  const safe = action === "load" || action === "syncFromSource";   // repeating these is harmless
-  for (let attempt = 0; ; attempt++) {
-    let j;
-    try {
-      const r = await fetch(url, { method: "POST", body: JSON.stringify({ action, idToken, ...payload }) });
-      const t = await r.text();
-      try { j = JSON.parse(t); }
-      catch (e) {
-        const page = t.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
-        throw Object.assign(new Error("The sheet script sent an error page instead of data (HTTP " + r.status + (page ? ": " + page : "") + ")"), { soft: true });
-      }
-    } catch (e) {
-      if ((e.soft || e instanceof TypeError) && safe && attempt < 2) { await sleep(1500 * (attempt + 1)); continue; }
-      throw e;
-    }
-    if (!j.ok) {
-      if (/^BUSY/.test(j.error || "") && attempt < 2) { await sleep(2000 * (attempt + 1)); continue; }   // lock busy, nothing changed
-      throw new Error(j.error || "Request failed");
-    }
-    if (action === "load" && j.timing) {
-      const rt = performance.now() - t0, srv = j.timing.authMs + j.timing.loadMs;
-      console.log(`[perf] load …${url.slice(-10)}: ${Math.round(rt)} ms total = network + Apps Script start ${Math.round(rt - srv)} ms + auth/members ${j.timing.authMs} ms + sheet reads ${j.timing.loadMs} ms`);
-    }
-    return j;
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 30000);
+  let r;
+  try {
+    r = await fetch(url, { method: "POST", body: JSON.stringify({ action, idToken, ...payload }), signal: ctl.signal });
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("No answer from the sheet script after 30 s");
+    throw e;
+  } finally { clearTimeout(timer); }
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || "Request failed");
+  if (action === "load" && j.timing) {
+    const rt = performance.now() - t0, srv = j.timing.authMs + j.timing.loadMs;
+    console.log(`[perf] load …${url.slice(-10)}: ${Math.round(rt)} ms total = network + Apps Script start ${Math.round(rt - srv)} ms + auth/members ${j.timing.authMs} ms + sheet reads ${j.timing.loadMs} ms`);
   }
+  return j;
 }
-
 let syncRun = null, syncAgain = false;
 async function syncMirrors(idToken) {
   if (syncRun) { syncAgain = true; return syncRun; }        // one sync at a time; later requests become one repeat
