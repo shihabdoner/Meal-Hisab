@@ -517,3 +517,14 @@ body.isMember{--sk-a:#212824;--sk-b:#2c352f}
 
 
 
+/* ---- Meal history: slide toggle (placed after the meal boxes) ---- */
+#mealPerson>.mealEditor:first-child{margin-top:8px;padding-top:0;border-top:0}
+.histToggle{display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:12px;text-align:left;border-radius:8px}
+.histToggle .chev{transition:transform .3s ease}
+.histToggle[aria-expanded="false"] .chev{transform:rotate(-90deg)}
+.histBody{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s ease}
+.histBody.open{grid-template-rows:1fr}
+.histInner{min-height:0;overflow:hidden;visibility:hidden;transition:visibility 0s .35s}
+.histBody.open .histInner{visibility:visible;transition:visibility 0s}
+.histBody .historyList{margin:10px 0 0}
+@media(prefers-reduced-motion:reduce){.histBody,.histToggle .chev{transition:none}}
