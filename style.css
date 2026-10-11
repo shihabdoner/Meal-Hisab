@@ -589,3 +589,13 @@ body.isMember{--sk-a:#212824;--sk-b:#2c352f}
   body.isMember .secMeal .mealHistoryRow b.amt{animation:none}
   button{transition:none}
 }
+/* ---- Sheet view: total row stays fixed at the bottom ---- */
+:is(body,body.isMember) .sheetTbl.sheetTbl tr.total td{
+  position:sticky;bottom:0;z-index:2;
+  background:#f3f3f3;border-top:2px solid #333;
+  box-shadow:0 -1px 0 #333;
+}
+/* total row's first cell: pinned to the bottom AND the left, above the other cells */
+:is(body,body.isMember) .sheetTbl.sheetTbl tr.total td:first-child{
+  left:0;bottom:0;z-index:4;background:#e6e6e6;
+}
