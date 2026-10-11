@@ -119,6 +119,8 @@ $("bookSel").addEventListener("change", () => {
 
 // ---------- API (Google Apps Script web app on top of each sheet) ----------
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const isPreview = () => !!(me && me.admin && previewName);
+const loadSheet = async b => call(b.url, "load", {}, await auth.currentUser.getIdToken());
 async function call(url, action, payload, idToken) {
   const t0 = performance.now();
   const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 30000);
@@ -290,6 +292,7 @@ async function refresh(force) {
       }
     }
   } finally { if (my === seq) busy = false; }
+}
 
 // Reload the other sheet's tables when a panel is opened (they are not re-fetched on every poll while closed).
 SHEET_PANELS.forEach(id => $(id).addEventListener("toggle", () => {
