@@ -103,21 +103,26 @@
           <label for="mealWho">Select person</label>
           <select id="mealWho"></select>
           <div id="mealPerson" hidden>
-            <div style="margin-top:6px"><b>Meal history</b></div>
-            <div id="mealHistory" class="historyList"></div>
-            <div class="mealEditor">
-              <label for="mealDate">Entry date</label>
-              <input id="mealDate" type="date" class="mdate">
-              <div class="tablewrap">
-                <table>
-                  <tr><th>দুপুর</th><th>রাত</th></tr>
-                  <tr><td><textarea id="lunch" aria-label="দুপুর"></textarea></td><td><textarea id="dinner" aria-label="রাত"></textarea></td></tr>
-                </table>
-              </div>
-              <button id="mealSave" style="margin-top:8px" hidden>Save (add only)</button>
-              <div class="status" id="status"></div>
-            </div>
-          </div>
+  <div class="mealEditor">
+    <label for="mealDate">Entry date</label>
+    <input id="mealDate" type="date" class="mdate">
+    <div class="tablewrap">
+      <table>
+        <tr><th>দুপুর</th><th>রাত</th></tr>
+        <tr><td><textarea id="lunch" aria-label="দুপুর"></textarea></td><td><textarea id="dinner" aria-label="রাত"></textarea></td></tr>
+      </table>
+    </div>
+    <button id="mealSave" style="margin-top:8px" hidden>Save (add only)</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <button type="button" id="mealHistToggle" class="histToggle" aria-expanded="false" aria-controls="mealHistBody">
+    <span>Meal history</span><span class="chev">▾</span>
+  </button>
+  <div id="mealHistBody" class="histBody">
+    <div class="histInner"><div id="mealHistory" class="historyList"></div></div>
+  </div>
+</div>
         </div>
       </section>
 
