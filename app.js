@@ -241,7 +241,7 @@ onAuthStateChanged(auth, user => {
   showShell();
   announce("Loading your data…");
   refresh(true);
-  poll = setInterval(() => { if (!document.hidden && me) refresh(); }, 15000);
+  poll = setInterval(() => { if (!document.hidden && me) refresh(); }, 60000);
 });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && auth.currentUser) refresh(); });
 
@@ -287,12 +287,7 @@ async function refresh(force) {
     $("app").classList.remove("loading"); $("app").removeAttribute("aria-busy");
     if (wasLoading) { announce("Data loaded."); perfLog("main content visible", performance.now() - t0); }
 
-    if (b !== srcBook && (force || tblFor !== b.id || anySheetOpen())) loadTables();   // not awaited
-
-    if (me.admin && !autoSynced && otherBooks.length) {               // once per visit: bring the other sheet in line
-      autoSynced = true;
-      syncMirrors().then(f => { if (f.length) alert("Sync problem: " + f.join("; ")); });
-    }
+    if (b !== srcBook && (force || tblFor !== b.id || (anySheetOpen() && Date.now() - tblStamp > 60000))) loadTables();   // not awaited
   } catch (e) {
     if (my !== seq || ep !== epoch) return;
     if (/group list/i.test(e.message)) showLogin(e.message + ". Ask the admin to add this email.", true);
