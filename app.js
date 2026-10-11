@@ -98,7 +98,7 @@ let me = null;            // the real signed-in user (from the sheet's Members t
 let U = null;             // the user whose interface is shown (= me, or a member while the admin previews)
 let S = null;             // data of the source sheet (everything except the Sheet view tables)
 let T = null, tblErr = ""; // data shown in the Sheet view tables
-let busy = false, poll = null, previewName = "", autoSynced = false;
+let busy = false, poll = null, previewName = "", autoSynced = false, lastLoadAt = 0;
 let inlineOpen = false, permDirty = false;
 let epoch = 0, seq = 0, tblReq = 0, tblFor = "", tblStamp = 0, lastSig = "";   // guards against stale responses
 const mealDirty = { lunch: false, dinner: false };
@@ -135,7 +135,7 @@ async function call(url, action, payload, idToken) {
   if (!j.ok) throw new Error(j.error || "Request failed");
   if (action === "load" && j.timing) {
     const rt = performance.now() - t0, srv = j.timing.authMs + j.timing.loadMs;
-    console.log(`[perf] load …${url.slice(-10)}: ${Math.round(rt)} ms total = network + Apps Script start ${Math.round(rt - srv)} ms + auth/members ${j.timing.authMs} ms + sheet reads ${j.timing.loadMs} ms`);
+    console.log(`[perf] load …${url.slice(-10)}: ${Math.round(rt)} ms total = network + Apps Script start ${Math.round(rt - srv)} ms + auth/members ${j.timing.authMs} ms + sheet reads ${j.timing.loadMs} ms (layout ${j.timing.layoutMs ?? "?"} ms)`);
   }
   return j;
 }
@@ -225,16 +225,16 @@ function setLive(on) { const l = $("live"); l.textContent = on ? "● live" : "�
 onAuthStateChanged(auth, user => {
   epoch++; seq++; tblReq++;                              // everything still in flight is now stale
   clearInterval(poll); me = null; U = null; S = null; T = null; tblErr = ""; tblFor = ""; tblStamp = 0; lastSig = "";
-  previewName = ""; autoSynced = false; busy = false; setLive(false);
+  previewName = ""; autoSynced = false; busy = false; lastLoadAt = 0; setLive(false);
   $("bookTitle").textContent = srcBook.label;
   if (!user) { setRoleHint(""); document.body.classList.remove("isMember"); return showLogin(); }
   perfLog("auth ready (since app.js start)", performance.now() - T_START);
   showShell();
   announce("Loading your data…");
   refresh(true);
-  poll = setInterval(() => { if (!document.hidden && me) refresh(); }, 60000);
+  poll = setInterval(() => { if (!document.hidden && me && Date.now() - lastLoadAt >= 15000) refresh(); }, 60000);
 });
-document.addEventListener("visibilitychange", () => { if (!document.hidden && auth.currentUser) refresh(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && auth.currentUser && Date.now() - lastLoadAt >= 15000) refresh(); });
 
 const SHEET_PANELS = ["sheetMeals", "sheetSpending", "sheetDeposits"];
 const anySheetOpen = () => SHEET_PANELS.some(id => $(id).open);
@@ -263,6 +263,7 @@ async function refresh(force) {
   try {
     const data = await api("load");
     if (my !== seq || ep !== epoch) return;              // a newer refresh or a sign-out replaced this one
+    lastLoadAt = Date.now();
     perfLog("essential data (token + load)", performance.now() - t0);
     S = data; me = S.me; setLive(true); setRoleHint(me.admin ? "admin" : "member");
     $("boot").hidden = true; $("login").hidden = true; $("app").hidden = false;
@@ -278,8 +279,9 @@ async function refresh(force) {
     $("app").classList.remove("loading"); $("app").removeAttribute("aria-busy");
     if (wasLoading) { announce("Data loaded."); perfLog("main content visible", performance.now() - t0); }
 
-    if (b !== srcBook && (force || tblFor !== b.id || (anySheetOpen() && Date.now() - tblStamp > 60000))) loadTables();   // not awaited
-    } catch (e) {
+    if (b !== srcBook && anySheetOpen() && (force || tblFor !== b.id || Date.now() - tblStamp > 60000)) loadTables();   // not awaited
+    else if (b !== srcBook && force) tblStamp = 0;       // no panel open: reload when a panel is opened next (the toggle handler checks tblStamp)
+  } catch (e) {
     if (my !== seq || ep !== epoch) return;
     console.error(e);
     if (/group list/i.test(e.message)) showLogin(e.message + ". Ask the admin to add this email.", true);
