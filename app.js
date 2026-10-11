@@ -6,6 +6,16 @@ import * as CFG from "./firebase-config.js";
 const firebaseConfig = CFG.firebaseConfig;
 
 const $ = id => document.getElementById(id);
+
+// ---------- Loading helpers / timing (console only) ----------
+const T_START = performance.now();
+const perfLog = (label, ms) => console.log(`[perf] ${label}: ${Math.round(ms)} ms`);
+const announce = msg => { $("loadStatus").textContent = msg; };
+// Cosmetic hint only (which theme to show while loading). Permissions always come from the server.
+const HINT = "khaddoRole";
+const roleHint = () => { try { return localStorage.getItem(HINT) || ""; } catch (e) { return ""; } };
+const setRoleHint = v => { try { v ? localStorage.setItem(HINT, v) : localStorage.removeItem(HINT); } catch (e) { /* private mode */ } };
+
 const NAMES = ["Shohan", "Naved", "Salman", "Rifat", "Shihab", "Ashmit"];
 
 // What the admin can show / hide for each member (keys match VIEW_KEYS in the Apps Script)
@@ -77,7 +87,7 @@ function setMemberView(on) {
 // Several Google Sheets are connected (each has its own Apps Script web app + Members tab).
 const isUrl = u => /^https?:\/\//.test(u || "") && !String(u).includes("PASTE_");
 const books = (Array.isArray(CFG.BOOKS) && CFG.BOOKS.length ? CFG.BOOKS : [{ id: "main", label: "খাদ্য তথ্য", url: CFG.SCRIPT_URL }]).filter(b => isUrl(b.url));
-if (!books.length) { $("setup").hidden = false; throw new Error("No sheet connected"); }
+if (!books.length) { $("boot").hidden = true; $("setup").hidden = false; throw new Error("No sheet connected"); }
 
 // "খাদ্য তথ্য" is the source of truth: every number, history, alert and permission comes from it.
 const srcBook = books.find(b => b.id === "khaddo") || books[0];
@@ -90,6 +100,7 @@ let S = null;             // data of the source sheet (everything except the She
 let T = null, tblErr = ""; // data shown in the Sheet view tables
 let busy = false, poll = null, previewName = "", autoSynced = false;
 let inlineOpen = false, permDirty = false;
+let epoch = 0, seq = 0, tblReq = 0, tblFor = "", tblStamp = 0, lastSig = "";   // guards against stale responses
 const mealDirty = { lunch: false, dinner: false };
 
 // Sheet view: members always see "বেলা হিসাব" (id "bazar"); the admin chooses with the dropdown.
@@ -109,9 +120,14 @@ $("bookSel").addEventListener("change", () => {
 // ---------- API (Google Apps Script web app on top of each sheet) ----------
 const isPreview = () => !!(me && me.admin && previewName);
 async function call(url, action, payload, idToken) {
+  const t0 = performance.now();
   const r = await fetch(url, { method: "POST", body: JSON.stringify({ action, idToken, ...payload }) });
   const j = await r.json();
   if (!j.ok) throw new Error(j.error || "Request failed");
+  if (action === "load" && j.timing) {
+    const rt = performance.now() - t0, srv = j.timing.authMs + j.timing.loadMs;
+    console.log(`[perf] load …${url.slice(-10)}: ${Math.round(rt)} ms total = network + Apps Script start ${Math.round(rt - srv)} ms + auth/members ${j.timing.authMs} ms + sheet reads ${j.timing.loadMs} ms`);
+  }
   return j;
 }
 const loadSheet = async b => call(b.url, "load", {}, await auth.currentUser.getIdToken());
@@ -160,50 +176,108 @@ $("refresh").onclick = async () => {
   refresh(true);
 };
 
-function showLogin(msg, denied) {
-  $("app").hidden = true; $("login").hidden = false;
+function showLogin(msg, denied, retry) {
+  $("boot").hidden = true;
+  $("app").hidden = true; $("app").classList.remove("loading"); $("app").removeAttribute("aria-busy"); $("login").hidden = false;
   $("loginMsg").textContent = msg || "Sign in with the Google account the admin added for you.";
-  $("gBtn").hidden = !!denied; $("deniedOut").hidden = !denied;
+  $("gBtn").hidden = !!denied || !!retry;
+  $("deniedOut").hidden = !denied && !retry;
+  $("retryBtn").hidden = !retry;
+}
+$("retryBtn").onclick = () => { $("loginMsg").textContent = "Loading…"; showShell(); refresh(true); };
+
+// Show the page structure immediately; only the data areas are skeletons.
+function showShell() {
+  $("login").hidden = true;
+  const hint = roleHint();
+  if (!hint) {                                           // first ever visit: generic skeleton
+    document.body.classList.remove("isMember");
+    $("app").hidden = true; $("boot").hidden = false;
+    return;
+  }
+  $("boot").hidden = true; $("app").hidden = false;
+  document.body.classList.toggle("isMember", hint === "member");
+  if (hint === "member") document.querySelector(".secMeal").classList.add("open");   // same as the real first view
+  $("app").classList.add("loading"); $("app").setAttribute("aria-busy", "true");
 }
 function setLive(on) { const l = $("live"); l.textContent = on ? "● live" : "● offline"; l.className = "live " + (on ? "on" : "off"); }
 
 onAuthStateChanged(auth, user => {
-  document.body.classList.remove("isMember");
-  clearInterval(poll); me = null; U = null; S = null; T = null; previewName = ""; autoSynced = false; setLive(false);
+  epoch++; seq++; tblReq++;                              // everything still in flight is now stale
+  clearInterval(poll); me = null; U = null; S = null; T = null; tblErr = ""; tblFor = ""; tblStamp = 0; lastSig = "";
+  previewName = ""; autoSynced = false; busy = false; setLive(false);
   $("bookTitle").textContent = srcBook.label;
-  if (!user) return showLogin();
-  $("loginMsg").textContent = "Loading…";
+  if (!user) { setRoleHint(""); document.body.classList.remove("isMember"); return showLogin(); }
+  perfLog("auth ready (since app.js start)", performance.now() - T_START);
+  showShell();
+  announce("Loading your data…");
   refresh(true);
   poll = setInterval(() => { if (!document.hidden && me) refresh(); }, 15000);
 });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && auth.currentUser) refresh(); });
 
+const SHEET_PANELS = ["sheetMeals", "sheetSpending", "sheetDeposits"];
+const anySheetOpen = () => SHEET_PANELS.some(id => $(id).open);
+
+// Secondary data: the other sheet's tables. Never blocks the main content.
 async function loadTables() {
   const b = books[tblIdx()];
-  tblErr = "";
-  if (b === srcBook) { T = S; return; }
-  try { T = await loadSheet(b); }
-  catch (e) { T = null; tblErr = b.label + ": " + e.message; }
+  if (b === srcBook) return;
+  const my = ++tblReq, ep = epoch, t0 = performance.now();
+  try {
+    const data = await loadSheet(b);
+    if (my !== tblReq || ep !== epoch || b !== books[tblIdx()]) return;
+    T = data; tblFor = b.id; tblErr = ""; tblStamp = Date.now();
+    perfLog("secondary data (" + b.label + ")", performance.now() - t0);
+  } catch (e) {
+    if (my !== tblReq || ep !== epoch || b !== books[tblIdx()]) return;
+    T = null; tblErr = b.label + ": " + e.message;       // never keep showing old money tables after a failed refresh
+  }
+  renderTables();
 }
 
 async function refresh(force) {
   if (busy && !force) return;
+  const my = ++seq, ep = epoch, t0 = performance.now();
   busy = true;
   try {
-    S = await api("load"); me = S.me; setLive(true);
-    $("login").hidden = true; $("app").hidden = false;
-    applyRole();
-    await loadTables();
-    render(); renderAlerts(); syncMeal();
+    const data = await api("load");
+    if (my !== seq || ep !== epoch) return;              // a newer refresh or a sign-out replaced this one
+    perfLog("essential data (token + load)", performance.now() - t0);
+    S = data; me = S.me; setLive(true); setRoleHint(me.admin ? "admin" : "member");
+    $("boot").hidden = true; $("login").hidden = true; $("app").hidden = false;
+    const wasLoading = $("app").classList.contains("loading");
+    const sig = JSON.stringify({ ...data, timing: 0 }), changed = force || wasLoading || sig !== lastSig;
+    lastSig = sig;
+
+    const b = books[tblIdx()];
+    if (b === srcBook) { T = S; tblFor = b.id; tblErr = ""; }
+    else if (tblFor !== b.id) { T = null; tblErr = ""; }  // different sheet: placeholder until it arrives
+
+    if (changed) { applyRole(); render(); renderAlerts(); syncMeal(); }   // polls with identical data skip the DOM rebuild
+    $("app").classList.remove("loading"); $("app").removeAttribute("aria-busy");
+    if (wasLoading) { announce("Data loaded."); perfLog("main content visible", performance.now() - t0); }
+
+    if (b !== srcBook && (force || tblFor !== b.id || anySheetOpen())) loadTables();   // not awaited
+
     if (me.admin && !autoSynced && otherBooks.length) {               // once per visit: bring the other sheet in line
       autoSynced = true;
       syncMirrors().then(f => { if (f.length) alert("Sync problem: " + f.join("; ")); });
     }
   } catch (e) {
+    if (my !== seq || ep !== epoch) return;
     if (/group list/i.test(e.message)) showLogin(e.message + ". Ask the admin to add this email.", true);
-    else { setLive(false); if (!me) showLogin("Could not reach the sheet: " + e.message, true); }
-  } finally { busy = false; }
+    else {
+      setLive(false);
+      if (!me) { announce("Could not load data."); showLogin("Could not reach the sheet: " + e.message, false, true); }
+    }
+  } finally { if (my === seq) busy = false; }
 }
+
+// Reload the other sheet's tables when a panel is opened (they are not re-fetched on every poll while closed).
+SHEET_PANELS.forEach(id => $(id).addEventListener("toggle", () => {
+  if ($(id).open && me && books[tblIdx()] !== srcBook && Date.now() - tblStamp > 5000) loadTables();
+}));
 
 // ---------- Who is the interface for (admin preview) ----------
 function effectiveMember() {
@@ -392,7 +466,9 @@ function renderHistories() {
   if (!sp.length) sl.textContent = "No spending yet";
   const byDate = {};
   sp.forEach(e => (byDate[e.date] = byDate[e.date] || []).push(e));
-  Object.keys(byDate).sort().reverse().forEach(d => sl.appendChild(spendDateEl(d, byDate[d].sort(byWhen))));
+  const frag = document.createDocumentFragment();
+  Object.keys(byDate).sort().reverse().forEach(d => frag.appendChild(spendDateEl(d, byDate[d].sort(byWhen))));
+  sl.appendChild(frag);
 
   // fund history of the selected person: every deposit (date, time, who added it) – refreshed after each add / edit
   const who = $("fundWho").value;
@@ -405,7 +481,9 @@ function renderHistories() {
   const list = (S.depositLog || []).filter(e => e.person === who).sort((a, b) => b.date.localeCompare(a.date) || (b.time || "").localeCompare(a.time || ""));
   const dl = $("deps"); dl.textContent = "";
   if (!list.length) dl.textContent = "এখনো কোনো জমা নেই";
-  list.forEach(e => dl.appendChild(depositRowEl(e, who, latest)));
+  const dfrag = document.createDocumentFragment();
+  list.forEach(e => dfrag.appendChild(depositRowEl(e, who, latest)));
+  dl.appendChild(dfrag);
 }
 
 function actionsEl(editFn, delFn) {
@@ -542,6 +620,7 @@ function renderMealHistory(name) {
   });
   rows.sort((a, b) => b.date.localeCompare(a.date));
   if (!rows.length) { box.textContent = "No meal entries yet"; return; }
+  const frag = document.createDocumentFragment();
   rows.forEach(e => {
     const r = document.createElement("div"); r.className = "row mealHistoryRow";
     const a = document.createElement("span"); a.className = "spendingDescription"; a.appendChild(dateChip(e.date));
@@ -549,8 +628,9 @@ function renderMealHistory(name) {
     if (e.lunch || e.dinner) parts.push(`দুপুর: ${e.lunch || "—"} · রাত: ${e.dinner || "—"}`);
     if (parts.length) a.append(" · " + parts.join(" · "));
     r.append(a, e.count !== "" ? amountEl(`${e.count} meal${num(e.count) === 1 ? "" : "s"}`) : document.createElement("span"));
-    box.appendChild(r);
+    frag.appendChild(r);
   });
+  box.appendChild(frag);
 }
 
 function table(head, rows, total, hl) {
@@ -568,7 +648,17 @@ function table(head, rows, total, hl) {
 // Only these three tables follow the chosen sheet (T); everything else uses the source sheet (S).
 function renderTables() {
   const ids = ["tblMeals", "tblDeposits", "tblSpending"];
-  if (!T) { ids.forEach(id => { $(id).textContent = tblErr || "Could not load this sheet"; }); return; }
+  if (!T) {
+    ids.forEach(id => {
+      const box = $(id); box.textContent = "";
+      if (!tblErr) return;                               // still loading: the empty box shows the CSS skeleton
+      const m = document.createElement("div"); m.className = "inlineError"; m.setAttribute("role", "alert"); m.textContent = tblErr;
+      const rb = document.createElement("button"); rb.type = "button"; rb.textContent = "Retry";
+      rb.onclick = () => { tblErr = ""; renderTables(); loadTables(); };
+      box.append(m, rb);
+    });
+    return;
+  }
   const sums = (dates, src) => NAMES.map(n => dates.reduce((t, d) => t + num(src[d][n]), 0));
   const put = (id, el) => { const b = $(id); b.textContent = ""; b.appendChild(el); };
   put("tblMeals", table(["Tarikh", ...NAMES], T.mealDates.map(d => [d, ...NAMES.map(n => T.meals[d][n])]),
