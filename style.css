@@ -490,3 +490,30 @@ body.isMember button.moreBtn:hover{background:none;color:#fff}
 body.isMember .spDayHead,body.isMember .spItemTitle,body.isMember .spItem .fld label{color:#8a968e}
 
 @media(max-width:440px){.spItem{grid-template-columns:1fr}}
+/* ===== Loading skeletons ===== */
+:root{--sk-a:#2a2a28;--sk-b:#3b3b38}
+body.isMember{--sk-a:#212824;--sk-b:#2c352f}
+.srOnly{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+@keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+.skel,
+#app.loading .card .v,
+#spList:empty::before,
+#tblMeals:empty::before,#tblSpending:empty::before,#tblDeposits:empty::before{
+  background:linear-gradient(90deg,var(--sk-a) 25%,var(--sk-b) 50%,var(--sk-a) 75%);
+  background-size:200% 100%;animation:shimmer 1.4s infinite linear;border-radius:8px}
+.skel-bar{height:44px;margin-bottom:12px}
+.skel-card{height:78px}
+.skel-section{height:140px;margin-top:16px}
+#app.loading .card .v{color:transparent!important;text-shadow:none;width:60%;min-height:1.6em;user-select:none}
+#app.loading .card .small,#app.loading .lastd{visibility:hidden}
+#spList:empty::before,#tblMeals:empty::before,#tblSpending:empty::before,#tblDeposits:empty::before{content:"";display:block;height:56px}
+#tblMeals:empty::before,#tblSpending:empty::before,#tblDeposits:empty::before{height:160px}
+.inlineError{color:#ff6b6b;margin:8px 0}
+@media(prefers-reduced-motion:reduce){
+  .skel,#app.loading .card .v,#spList:empty::before,
+  #tblMeals:empty::before,#tblSpending:empty::before,#tblDeposits:empty::before{animation:none}
+}
+
+
+
+
