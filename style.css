@@ -577,3 +577,15 @@ body.isMember{--sk-a:#212824;--sk-b:#2c352f}
   :is(body,body.isMember) .sheetTbl.sheetTbl th,
   :is(body,body.isMember) .sheetTbl.sheetTbl td{padding:3px 6px}
 }
+
+
+/* ---- Performance: no endless animations on phones / tablets ---- */
+@media(max-width:900px),(hover:none){
+  h2.flick,.alertDot,.live.on{animation:none}
+  .live.on{text-shadow:none}
+  h2.flick{text-shadow:none;color:#9aa89f}
+  body.isMember .secMeal,body.isMember .secMeal table,body.isMember .secMeal th,
+  body.isMember .secMeal td,body.isMember .secMeal .secTitle,
+  body.isMember .secMeal .mealHistoryRow b.amt{animation:none}
+  button{transition:none}
+}
