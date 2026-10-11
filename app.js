@@ -664,7 +664,10 @@ function renderMealHistory(name) {
 
 function table(head, rows, total, hl) {
   const t = document.createElement("table"); t.className = "sheetTbl";
-  const hr = t.createTHead().insertRow();
+  const th0 = t.createTHead();
+  const lr = th0.insertRow(); lr.className = "colLetters";           // A, B, C… like Excel
+  head.forEach((_, i) => { const c = document.createElement("th"); c.textContent = String.fromCharCode(65 + i); lr.appendChild(c); });
+  const hr = th0.insertRow();
   head.forEach(h => { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); });
   const tb = t.createTBody();
   rows.forEach(([key, ...cells]) => {
