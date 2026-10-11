@@ -118,27 +118,56 @@ $("bookSel").addEventListener("change", () => {
 });
 
 // ---------- API (Google Apps Script web app on top of each sheet) ----------
-const isPreview = () => !!(me && me.admin && previewName);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function call(url, action, payload, idToken) {
   const t0 = performance.now();
-  const r = await fetch(url, { method: "POST", body: JSON.stringify({ action, idToken, ...payload }) });
-  const j = await r.json();
-  if (!j.ok) throw new Error(j.error || "Request failed");
-  if (action === "load" && j.timing) {
-    const rt = performance.now() - t0, srv = j.timing.authMs + j.timing.loadMs;
-    console.log(`[perf] load …${url.slice(-10)}: ${Math.round(rt)} ms total = network + Apps Script start ${Math.round(rt - srv)} ms + auth/members ${j.timing.authMs} ms + sheet reads ${j.timing.loadMs} ms`);
+  const safe = action === "load" || action === "syncFromSource";   // repeating these is harmless
+  for (let attempt = 0; ; attempt++) {
+    let j;
+    try {
+      const r = await fetch(url, { method: "POST", body: JSON.stringify({ action, idToken, ...payload }) });
+      const t = await r.text();
+      try { j = JSON.parse(t); }
+      catch (e) {
+        const page = t.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+        throw Object.assign(new Error("The sheet script sent an error page instead of data (HTTP " + r.status + (page ? ": " + page : "") + ")"), { soft: true });
+      }
+    } catch (e) {
+      if ((e.soft || e instanceof TypeError) && safe && attempt < 2) { await sleep(1500 * (attempt + 1)); continue; }
+      throw e;
+    }
+    if (!j.ok) {
+      if (/^BUSY/.test(j.error || "") && attempt < 2) { await sleep(2000 * (attempt + 1)); continue; }   // lock busy, nothing changed
+      throw new Error(j.error || "Request failed");
+    }
+    if (action === "load" && j.timing) {
+      const rt = performance.now() - t0, srv = j.timing.authMs + j.timing.loadMs;
+      console.log(`[perf] load …${url.slice(-10)}: ${Math.round(rt)} ms total = network + Apps Script start ${Math.round(rt - srv)} ms + auth/members ${j.timing.authMs} ms + sheet reads ${j.timing.loadMs} ms`);
+    }
+    return j;
   }
-  return j;
 }
-const loadSheet = async b => call(b.url, "load", {}, await auth.currentUser.getIdToken());
+
+let syncRun = null, syncAgain = false;
 async function syncMirrors(idToken) {
-  idToken = idToken || await auth.currentUser.getIdToken();
-  const fails = [];
-  await Promise.all(otherBooks.map(b => call(b.url, "syncFromSource", {}, idToken)
-    .then(j => { if (j.warn) fails.push(b.label + ": " + j.warn); })
-    .catch(e => fails.push(b.label + ": " + e.message))));
-  return fails;
+  if (syncRun) { syncAgain = true; return syncRun; }        // one sync at a time; later requests become one repeat
+  syncRun = (async () => {
+    let fails = [];
+    try {
+      do {
+        syncAgain = false;
+        const tok = await auth.currentUser.getIdToken();
+        fails = [];
+        await Promise.all(otherBooks.map(b => call(b.url, "syncFromSource", {}, tok)
+          .then(j => { if (j.warn) fails.push(b.label + ": " + j.warn); })
+          .catch(e => fails.push(b.label + ": " + e.message))));
+      } while (syncAgain);
+    } finally { syncRun = null; }
+    return fails;
+  })();
+  return syncRun;
 }
+
 async function api(action, payload = {}) {
   if (action !== "load" && isPreview()) throw new Error("Preview mode: switch back to “Your admin view” to make changes.");
   const idToken = await auth.currentUser.getIdToken();
