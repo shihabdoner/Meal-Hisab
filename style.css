@@ -528,3 +528,52 @@ body.isMember{--sk-a:#212824;--sk-b:#2c352f}
 .histBody.open .histInner{visibility:visible;transition:visibility 0s}
 .histBody .historyList{margin:10px 0 0}
 @media(prefers-reduced-motion:reduce){.histBody,.histToggle .chev{transition:none}}
+/* ---- Sheet view: Excel look ---- */
+.sheet .tablewrap{max-height:70vh;overflow:auto;border:1px solid #b7b7b7;border-radius:4px;background:#fff}
+
+:is(body,body.isMember) .sheetTbl.sheetTbl{
+  border:0;border-collapse:separate;border-spacing:0;background:#fff;
+  font-family:Calibri,"Segoe UI",Arial,"Noto Sans Bengali",sans-serif;font-size:.8rem;
+  counter-reset:xl 0;table-layout:auto;min-width:0;
+}
+:is(body,body.isMember) .sheetTbl.sheetTbl th,
+:is(body,body.isMember) .sheetTbl.sheetTbl td{
+  border:0;border-right:1px solid #d4d4d4;border-bottom:1px solid #d4d4d4;
+  background:#fff;color:#000;padding:3px 8px;white-space:nowrap;text-align:right;height:22px;
+}
+/* column letters row */
+:is(body,body.isMember) .sheetTbl.sheetTbl thead tr.colLetters th{
+  position:sticky;top:0;z-index:3;background:#e6e6e6;color:#444;font-weight:400;text-align:center;
+  border-right:1px solid #bdbdbd;border-bottom:1px solid #bdbdbd;padding:2px 8px;height:20px;
+}
+/* header row (Tarikh, names…) */
+:is(body,body.isMember) .sheetTbl.sheetTbl thead tr:nth-child(2) th{
+  position:sticky;top:20px;z-index:3;background:#f3f3f3;color:#000;font-weight:700;text-align:center;
+  border-bottom:2px solid #9a9a9a;
+}
+/* row numbers: header row is 1, data rows follow */
+.sheetTbl thead tr:nth-child(2),.sheetTbl tbody tr{counter-increment:xl}
+.sheetTbl thead tr:nth-child(2) th:first-child::before,
+.sheetTbl tbody td:first-child::before{
+  content:counter(xl);display:inline-block;min-width:30px;margin:-3px 8px -3px -8px;padding:3px 0;
+  text-align:center;background:#e6e6e6;color:#444;font-weight:400;border-right:1px solid #bdbdbd;
+}
+/* first column (date) stays visible when scrolling sideways */
+:is(body,body.isMember) .sheetTbl.sheetTbl td:first-child,
+:is(body,body.isMember) .sheetTbl.sheetTbl thead tr:nth-child(2) th:first-child{
+  position:sticky;left:0;z-index:2;text-align:left;color:#000;background:#fff;
+}
+:is(body,body.isMember) .sheetTbl.sheetTbl thead tr.colLetters th:first-child{left:0;z-index:4}
+:is(body,body.isMember) .sheetTbl.sheetTbl thead tr:nth-child(2) th:first-child{z-index:4;background:#f3f3f3}
+/* today = highlighted row, total = bold with a line above */
+:is(body,body.isMember) .sheetTbl.sheetTbl tr.today td,
+:is(body,body.isMember) .sheetTbl.sheetTbl tr.today td:first-child{background:#fff2cc;color:#000}
+:is(body,body.isMember) .sheetTbl.sheetTbl tr.total td,
+:is(body,body.isMember) .sheetTbl.sheetTbl tr.total td:first-child{
+  font-weight:700;background:#f3f3f3;color:#000;border-top:2px solid #333;
+}
+@media(max-width:600px){
+  :is(body,body.isMember) .sheetTbl.sheetTbl{font-size:.74rem}
+  :is(body,body.isMember) .sheetTbl.sheetTbl th,
+  :is(body,body.isMember) .sheetTbl.sheetTbl td{padding:3px 6px}
+}
