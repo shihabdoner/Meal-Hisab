@@ -870,7 +870,11 @@ $("mealSave").onclick = () => { if (mealMode() === "add") sendMeal(); };
 const clearMealFields = () => { resetMealDirty(); $("lunch").value = ""; $("dinner").value = ""; };
 $("mealWho").addEventListener("change", () => { clearMealFields(); render(); syncMeal(); });
 $("mealDate").addEventListener("change", () => { clearMealFields(); syncMeal(); });
-
+// Meal history: slide open / closed (stays as the person left it across the 15 s refresh)
+$("mealHistToggle").onclick = () => {
+  const open = $("mealHistBody").classList.toggle("open");
+  $("mealHistToggle").setAttribute("aria-expanded", String(open));
+};
 // ---------- Print / Save as PDF ----------
 function rTable(head, rows, foot) {
   const t = document.createElement("table");
