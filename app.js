@@ -277,15 +277,19 @@ async function refresh(force) {
     if (wasLoading) { announce("Data loaded."); perfLog("main content visible", performance.now() - t0); }
 
     if (b !== srcBook && (force || tblFor !== b.id || (anySheetOpen() && Date.now() - tblStamp > 60000))) loadTables();   // not awaited
-  } catch (e) {
+    } catch (e) {
     if (my !== seq || ep !== epoch) return;
+    console.error(e);
     if (/group list/i.test(e.message)) showLogin(e.message + ". Ask the admin to add this email.", true);
     else {
       setLive(false);
       if (!me) { announce("Could not load data."); showLogin("Could not reach the sheet: " + e.message, false, true); }
+      else {
+        $("app").classList.remove("loading"); $("app").removeAttribute("aria-busy");
+        alert("Display error: " + e.message + "\n" + String((e.stack || "").split("\n")[1] || "").slice(0, 160));
+      }
     }
   } finally { if (my === seq) busy = false; }
-}
 
 // Reload the other sheet's tables when a panel is opened (they are not re-fetched on every poll while closed).
 SHEET_PANELS.forEach(id => $(id).addEventListener("toggle", () => {
