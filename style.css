@@ -645,3 +645,11 @@ body.isMember #toast{background:rgba(20,24,21,.94);border-color:#2f3a33}
   #toast{animation:none;transition:none}
   .tsBar b{animation:none;clip-path:none}
 }
+
+html,body{overscroll-behavior-y:none}
+body{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+button,summary,select,.secTitle{touch-action:manipulation;-webkit-user-select:none;user-select:none}
+input,select,textarea{font-size:16px}          /* stops iOS zooming in when you tap a field */
+button:active{transform:scale(.97)}
+@media(display-mode:standalone){main{padding-top:max(10px,env(safe-area-inset-top))}}
+
