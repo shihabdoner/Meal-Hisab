@@ -624,3 +624,24 @@ body.isMember{--sk-a:#212824;--sk-b:#2c352f}
 #veil .spBar{opacity:1;animation:none;margin:0 auto}
 #veil .spTag{opacity:1;animation:none;margin:12px auto 8px}
 @media(prefers-reduced-motion:reduce){#veil{transition:none}}
+
+/* ===== Bottom loading toast ===== */
+#toast{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:99996;
+  display:flex;align-items:center;gap:10px;max-width:min(92vw,360px);padding:8px 12px;
+  background:rgba(11,15,12,.92);border:2px solid #3a3a3a;border-radius:8px;
+  box-shadow:0 4px 14px rgba(0,0,0,.45);pointer-events:none;
+  opacity:0;visibility:hidden;transform:translate(-50%,16px);
+  transition:opacity .25s ease,transform .25s ease,visibility 0s .25s;
+  animation:toastPulse 1.6s ease-in-out infinite}
+#toast.show{opacity:1;visibility:visible;transform:translate(-50%,0);transition:opacity .25s ease,transform .25s ease}
+#toastTxt{color:#cfcfcf;font:.5rem/1.6 "Press Start 2P",monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tsBar{flex:0 0 64px;height:14px;padding:2px;border:2px solid #3a3a3a;background:#000}
+.tsBar b{display:block;height:100%;
+  background:linear-gradient(90deg,#5fd35f calc(100% - 2px),transparent 0) 0 0/10% 100%;
+  clip-path:inset(0 100% 0 0);animation:spFill 1.2s steps(10) infinite}
+@keyframes toastPulse{0%,100%{border-color:#3a3a3a}50%{border-color:#5fd35f}}
+body.isMember #toast{background:rgba(20,24,21,.94);border-color:#2f3a33}
+@media(prefers-reduced-motion:reduce){
+  #toast{animation:none;transition:none}
+  .tsBar b{animation:none;clip-path:none}
+}
