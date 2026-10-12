@@ -6,6 +6,37 @@ import * as CFG from "./firebase-config.js";
 const firebaseConfig = CFG.firebaseConfig;
 
 const $ = id => document.getElementById(id);
+
+// ---------- Bottom loading toast ----------
+const tasks = new Map();
+let taskId = 0, toastShownAt = 0, toastTimer = 0;
+const toastEl = $("toast"), toastTxt = $("toastTxt");
+function paintToast() {
+  clearTimeout(toastTimer);
+  const labels = [...tasks.values()];
+  if (labels.length) {
+    toastTxt.textContent = labels[labels.length - 1];
+    if (!toastEl.classList.contains("show")) { toastShownAt = performance.now(); toastEl.classList.add("show"); }
+    toastEl.setAttribute("aria-hidden", "false");
+  } else {
+    // stay visible at least 500 ms so quick tasks don't flicker
+    const wait = Math.max(0, 500 - (performance.now() - toastShownAt));
+    toastTimer = setTimeout(() => {
+      if (!tasks.size) { toastEl.classList.remove("show"); toastEl.setAttribute("aria-hidden", "true"); }
+    }, wait);
+  }
+}
+async function track(label, fn) {
+  const id = ++taskId; tasks.set(id, label); paintToast();
+  try { return await fn(); }
+  finally { tasks.delete(id); paintToast(); }
+}
+const ACT_LABELS = {
+  addSpending: "Adding grocery spending…", editSpending: "Saving changes…", clearSpending: "Deleting entry…",
+  addDeposit: "Adding deposit…", editDeposit: "Saving changes…", clearDeposit: "Deleting entry…",
+  savePerms: "Saving permissions…", saveMember: "Saving member…", makeAdmin: "Changing admin…", ackAlerts: "Updating alerts…"
+};
+
 function hideSplash() {
   const s = $("splash");
   if (!s || s.dataset.gone) return;
@@ -129,7 +160,7 @@ $("bookTitle").textContent = srcBook.label;
 $("bookSel").addEventListener("change", () => {
   adminIdx = Number($("bookSel").value);
   try { localStorage.setItem("book", books[adminIdx].id); } catch (e) { /* ignore */ }
-  refresh(true);
+  refresh(true, "Changing sheet…");
 });
 
 // ---------- API (Google Apps Script web app on top of each sheet) ----------
@@ -187,15 +218,17 @@ async function api(action, payload = {}) {
   return j;
 }
 async function act(action, payload) {
-  try { await api(action, payload); await refresh(true); return true; }
-  catch (e) { alert(e.message); refresh(true); return false; }
+  return track(ACT_LABELS[action] || "Saving…", async () => {
+    try { await api(action, payload); await refreshNow(true); return true; }
+    catch (e) { alert(e.message); refreshNow(true); return false; }
+  });
 }
 
 // ---------- Sign-in ----------
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: "select_account" });
 $("gBtn").onclick = async () => {
-  try { await signInWithPopup(auth, provider); }
+  try { await track("Signing in…", () => signInWithPopup(auth, provider)); }
   catch (e) {
     if (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment") signInWithRedirect(auth, provider);
     else if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request")
@@ -205,11 +238,11 @@ $("gBtn").onclick = async () => {
 $("out").onclick = $("deniedOut").onclick = () => signOut(auth);
 $("refresh").onclick = async () => {
   showVeil();
-  if (me && me.admin && !isPreview() && otherBooks.length) {          // ⟳ also re-syncs the other sheet
-    const fails = await syncMirrors().catch(e => [e.message]);
+  if (me && me.admin && !isPreview() && otherBooks.length) {
+    const fails = await track("Syncing sheets…", () => syncMirrors().catch(e => [e.message]));
     if (fails.length) alert("Sync problem: " + fails.join("; "));
   }
-  refresh(true);
+  refresh(true, "Reloading…");
 };
 
 function showLogin(msg, denied, retry) {
@@ -248,7 +281,7 @@ onAuthStateChanged(auth, user => {
   perfLog("auth ready (since app.js start)", performance.now() - T_START);
   showShell();
   announce("Loading your data…");
-  refresh(true);
+  refresh(true, "Loading your data…");
   poll = setInterval(() => { if (!document.hidden && me && Date.now() - lastLoadAt >= 15000) refresh(); }, 60000);
 });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && auth.currentUser && Date.now() - lastLoadAt >= 15000) refresh(); });
@@ -257,7 +290,7 @@ const SHEET_PANELS = ["sheetMeals", "sheetSpending", "sheetDeposits"];
 const anySheetOpen = () => SHEET_PANELS.some(id => $(id).open);
 
 // Secondary data: the other sheet's tables. Never blocks the main content.
-async function loadTables() {
+async function loadTablesNow() {
   const b = books[tblIdx()];
   if (b === srcBook) return;
   const my = ++tblReq, ep = epoch, t0 = performance.now();
@@ -272,8 +305,12 @@ async function loadTables() {
   }
   renderTables();
 }
+function loadTables() { return track("Loading sheet…", loadTablesNow); }
 
-async function refresh(force) {
+function refresh(force, label) {
+  return force ? track(label || "Loading…", () => refreshNow(force)) : refreshNow(force);   // polls stay silent
+}
+async function refreshNow(force) {
   if (busy && !force) return;
   const my = ++seq, ep = epoch, t0 = performance.now();
   busy = true;
@@ -314,8 +351,6 @@ async function refresh(force) {
   } finally { if (my === seq) { busy = false; hideVeil(); } }
 }
 
-
-
 // Reload the other sheet's tables when a panel is opened (they are not re-fetched on every poll while closed).
 SHEET_PANELS.forEach(id => $(id).addEventListener("toggle", () => {
   if ($(id).open && me && books[tblIdx()] !== srcBook && Date.now() - tblStamp > 5000) loadTables();
@@ -339,7 +374,7 @@ $("adminPreview").addEventListener("change", () => {
   const who = previewName || me.name;
   $("fundWho").value = who; $("mealWho").value = who;
   resetMealDirty(); inlineOpen = false;
-  refresh(true);
+  refresh(true, "Switching view…");
 });
 
 function applyRole() {
@@ -898,10 +933,10 @@ function syncMeal() {
 async function sendMeal() {
   $("status").textContent = "Saving…";
   try {
-    await api("setMeal", { person: $("mealWho").value, date: $("mealDate").value, lunch: $("lunch").value, dinner: $("dinner").value });
+    await track("Saving meal…", () => api("setMeal", { person: $("mealWho").value, date: $("mealDate").value, lunch: $("lunch").value, dinner: $("dinner").value }));
     resetMealDirty();
     $("status").textContent = "Saved to sheet ✓";
-    refresh(true);
+    refresh(true, "Updating…");
   } catch (e) { $("status").textContent = "Save failed: " + e.message; }
 }
 let saveTimer;
@@ -910,6 +945,7 @@ function autoSaveMeal() {
   $("status").textContent = "Saving…";
   clearTimeout(saveTimer); saveTimer = setTimeout(sendMeal, 600);
 }
+
 $("mealSave").onclick = () => { if (mealMode() === "add") sendMeal(); };
 ["lunch", "dinner"].forEach(k => $(k).addEventListener("input", () => { mealDirty[k] = true; autoSaveMeal(); }));
 const clearMealFields = () => { resetMealDirty(); $("lunch").value = ""; $("dinner").value = ""; };
