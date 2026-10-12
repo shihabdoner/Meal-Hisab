@@ -206,6 +206,7 @@ $("refresh").onclick = async () => {
 };
 
 function showLogin(msg, denied, retry) {
+  hideSplash();
   $("boot").hidden = true;
   $("app").hidden = true; $("app").classList.remove("loading"); $("app").removeAttribute("aria-busy"); $("login").hidden = false;
   $("loginMsg").textContent = msg || "Sign in with the Google account the admin added for you.";
@@ -286,6 +287,7 @@ async function refresh(force) {
 
     if (changed) { applyRole(); render(); renderAlerts(); syncMeal(); }   // polls with identical data skip the DOM rebuild
     $("app").classList.remove("loading"); $("app").removeAttribute("aria-busy");
+    hideSplash();
     if (wasLoading) { announce("Data loaded."); perfLog("main content visible", performance.now() - t0); }
 
     if (b !== srcBook && anySheetOpen() && (force || tblFor !== b.id || Date.now() - tblStamp > 60000)) loadTables();   // not awaited
