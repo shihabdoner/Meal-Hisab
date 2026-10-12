@@ -57,8 +57,18 @@
     <div class="spBar"><b></b></div>
   </div>
 </div>
+<div id="veil" aria-hidden="true">
+  <div class="veilBox">
+    <div class="spBar"><b></b></div>
+    <p class="spTag">loading…</p>
+  </div>
+</div>
 <script>
 (function(){
+var seen=false;
+try{seen=sessionStorage.getItem("splashSeen")==="1";}catch(e){}
+if(seen){document.getElementById("splash").remove();return;}   // reload: no splash
+try{sessionStorage.setItem("splashSeen","1");}catch(e){}
 var G={
 M:["10001","11011","10101","10001","10001"],
 E:["11111","10000","11110","10000","11111"],
