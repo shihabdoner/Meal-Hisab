@@ -11,9 +11,11 @@ const $ = id => document.getElementById(id);
 const tasks = new Map();
 let taskId = 0, toastShownAt = 0, toastTimer = 0;
 const toastEl = $("toast"), toastTxt = $("toastTxt");
+const fab = $("fab");                                    // floating reload button (spins while anything loads)
 function paintToast() {
   clearTimeout(toastTimer);
   const labels = [...tasks.values()];
+  if (fab) fab.classList.toggle("spin", labels.length > 0);
   if (labels.length) {
     toastTxt.textContent = labels[labels.length - 1];
     if (!toastEl.classList.contains("show")) { toastShownAt = performance.now(); toastEl.classList.add("show"); }
@@ -242,14 +244,17 @@ $("gBtn").onclick = async () => {
   }
 };
 $("out").onclick = $("deniedOut").onclick = () => signOut(auth);
-$("refresh").onclick = async () => {
+async function reloadAll() {
+  if (tasks.size) return location.reload();              // already loading and pressed again → it is stuck, restart the page
   showVeil();
   if (me && me.admin && !isPreview() && otherBooks.length) {
     const fails = await track("Syncing sheets…", () => syncMirrors().catch(e => [e.message]));
     if (fails.length) alert("Sync problem: " + fails.join("; "));
   }
   refresh(true, "Reloading…");
-};
+}
+$("refresh").onclick = reloadAll;
+if (fab) fab.onclick = reloadAll;
 
 function showLogin(msg, denied, retry) {
   hideSplash(); hideVeil();
