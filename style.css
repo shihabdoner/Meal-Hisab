@@ -616,3 +616,11 @@ body.isMember{--sk-a:#212824;--sk-b:#2c352f}
   .spBar b{animation:none;clip-path:none}
   #splash{transition:none}
 }
+/* ===== Loading veil (reloads / ⟳) ===== */
+#veil{position:fixed;inset:0;z-index:99997;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.5);opacity:0;visibility:hidden;transition:opacity .25s ease,visibility 0s .25s}
+#veil.show{opacity:1;visibility:visible;transition:opacity .25s ease}
+.veilBox{padding:16px 18px 6px;border-radius:10px;background:rgba(11,15,12,.85);border:2px solid #3a3a3a}
+#veil .spBar{opacity:1;animation:none;margin:0 auto}
+#veil .spTag{opacity:1;animation:none;margin:12px auto 8px}
+@media(prefers-reduced-motion:reduce){#veil{transition:none}}
