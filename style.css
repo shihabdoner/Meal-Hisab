@@ -653,3 +653,20 @@ input,select,textarea{font-size:16px}          /* stops iOS zooming in when you 
 button:active{transform:scale(.97)}
 @media(display-mode:standalone){main{padding-top:max(10px,env(safe-area-inset-top))}}
 
+
+
+/* ===== Floating reload button ===== */
+#fab{position:fixed;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(66px + env(safe-area-inset-bottom,0px));
+  z-index:99995;width:46px;height:46px;min-height:0;padding:0;border-radius:50%;
+  font-size:1.5rem;line-height:1;display:flex;align-items:center;justify-content:center;
+  background:rgba(11,15,12,.92);color:#5fd35f;border:2px solid #3a3a3a;
+  box-shadow:0 4px 14px rgba(0,0,0,.45);opacity:.85}
+#fab:hover,#fab:active{background:#016e30;color:#fff;border-color:#09ff00;opacity:1}
+#fab.spin{animation:fabSpin 1s linear infinite;border-color:#5fd35f}
+@keyframes fabSpin{to{transform:rotate(360deg)}}
+body.isMember #fab{background:rgba(20,24,21,.94);color:#8fd1a6;border-color:#2f3a33}
+body:has(#app[hidden]) #fab{display:none}   /* hidden on the sign-in screen */
+@media print{#fab{display:none!important}}
+@media(prefers-reduced-motion:reduce){#fab.spin{animation:none}}
+
+
