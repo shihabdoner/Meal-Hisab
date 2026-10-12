@@ -13,6 +13,12 @@ function hideSplash() {
   const wait = Math.max(0, 1800 - performance.now());   // let the animation finish first
   setTimeout(() => { s.classList.add("out"); setTimeout(() => s.remove(), 500); }, wait);
 }
+const veil = $("veil");
+const showVeil = () => veil.classList.add("show");
+const hideVeil = () => veil.classList.remove("show");
+if (!$("splash")) showVeil();          // splash was skipped, so this is a reload
+setTimeout(hideVeil, 10000);           // failsafe
+
 setTimeout(hideSplash, 8000);                            // failsafe: never trap the user
 
 
@@ -198,6 +204,7 @@ $("gBtn").onclick = async () => {
 };
 $("out").onclick = $("deniedOut").onclick = () => signOut(auth);
 $("refresh").onclick = async () => {
+  showVeil();
   if (me && me.admin && !isPreview() && otherBooks.length) {          // ⟳ also re-syncs the other sheet
     const fails = await syncMirrors().catch(e => [e.message]);
     if (fails.length) alert("Sync problem: " + fails.join("; "));
@@ -206,7 +213,7 @@ $("refresh").onclick = async () => {
 };
 
 function showLogin(msg, denied, retry) {
-  hideSplash();
+  hideSplash(); hideVeil();
   $("boot").hidden = true;
   $("app").hidden = true; $("app").classList.remove("loading"); $("app").removeAttribute("aria-busy"); $("login").hidden = false;
   $("loginMsg").textContent = msg || "Sign in with the Google account the admin added for you.";
@@ -291,7 +298,7 @@ async function refresh(force) {
     if (wasLoading) { announce("Data loaded."); perfLog("main content visible", performance.now() - t0); }
 
     if (b !== srcBook && anySheetOpen() && (force || tblFor !== b.id || Date.now() - tblStamp > 60000)) loadTables();   // not awaited
-    else if (b !== srcBook && force) tblStamp = 0;       // no panel open: reload when a panel is opened next (the toggle handler checks tblStamp)
+    else if (b !== srcBook && force) tblStamp = 0;       // no panel open: reload when a panel is opened next
   } catch (e) {
     if (my !== seq || ep !== epoch) return;
     console.error(e);
@@ -304,8 +311,10 @@ async function refresh(force) {
         alert("Display error: " + e.message + "\n" + String((e.stack || "").split("\n")[1] || "").slice(0, 160));
       }
     }
-  } finally { if (my === seq) busy = false; }
+  } finally { if (my === seq) { busy = false; hideVeil(); } }
 }
+
+
 
 // Reload the other sheet's tables when a panel is opened (they are not re-fetched on every poll while closed).
 SHEET_PANELS.forEach(id => $(id).addEventListener("toggle", () => {
