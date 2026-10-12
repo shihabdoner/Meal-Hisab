@@ -62,6 +62,12 @@ const HINT = "khaddoRole";
 const roleHint = () => { try { return localStorage.getItem(HINT) || ""; } catch (e) { return ""; } };
 const setRoleHint = v => { try { v ? localStorage.setItem(HINT, v) : localStorage.removeItem(HINT); } catch (e) { /* private mode */ } };
 
+// Last loaded data, shown instantly on the next open (only for the same signed-in user).
+const CACHE_KEY = "khaddoLastData";
+const saveCache = (uid, data) => { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ uid, data })); } catch (e) { /* full or private mode */ } };
+const loadCache = uid => { try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); return c && c.uid === uid && c.data && c.data.me ? c.data : null; } catch (e) { return null; } };
+const clearCache = () => { try { localStorage.removeItem(CACHE_KEY); } catch (e) { /* ignore */ } };
+
 const NAMES = ["Shohan", "Naved", "Salman", "Rifat", "Shihab", "Ashmit"];
 
 // What the admin can show / hide for each member (keys match VIEW_KEYS in the Apps Script)
@@ -219,7 +225,7 @@ async function api(action, payload = {}) {
 }
 async function act(action, payload) {
   return track(ACT_LABELS[action] || "Saving…", async () => {
-    try { await api(action, payload); await refreshNow(true); return true; }
+    try { await api(action, payload); navigator.vibrate?.(15); await refreshNow(true); return true; }   // light buzz on success (Android only)
     catch (e) { alert(e.message); refreshNow(true); return false; }
   });
 }
@@ -272,14 +278,32 @@ function showShell() {
 }
 function setLive(on) { const l = $("live"); l.textContent = on ? "● live" : "● offline"; l.className = "live " + (on ? "on" : "off"); }
 
+// Draw the last saved data straight away while the fresh load is still on its way.
+function showCached(user) {
+  const c = loadCache(user.uid);
+  if (!c) return;
+  try {
+    S = c; me = c.me;
+    const b = books[tblIdx()];
+    if (b === srcBook) { T = S; tblFor = b.id; tblErr = ""; }
+    applyRole(); render(); renderAlerts(); syncMeal();
+    $("boot").hidden = true; $("login").hidden = true; $("app").hidden = false;
+    $("app").classList.remove("loading"); $("app").removeAttribute("aria-busy");
+    hideSplash();
+  } catch (e) {                                          // bad cache: forget it and wait for the real load
+    console.error(e); clearCache(); S = null; me = null; U = null; T = null;
+  }
+}
+
 onAuthStateChanged(auth, user => {
   epoch++; seq++; tblReq++;                              // everything still in flight is now stale
   clearInterval(poll); me = null; U = null; S = null; T = null; tblErr = ""; tblFor = ""; tblStamp = 0; lastSig = "";
   previewName = ""; autoSynced = false; busy = false; lastLoadAt = 0; setLive(false);
   $("bookTitle").textContent = srcBook.label;
-  if (!user) { setRoleHint(""); document.body.classList.remove("isMember"); return showLogin(); }
+  if (!user) { clearCache(); setRoleHint(""); document.body.classList.remove("isMember"); return showLogin(); }
   perfLog("auth ready (since app.js start)", performance.now() - T_START);
   showShell();
+  showCached(user);
   announce("Loading your data…");
   refresh(true, "Loading your data…");
   poll = setInterval(() => { if (!document.hidden && me && Date.now() - lastLoadAt >= 15000) refresh(); }, 60000);
@@ -320,6 +344,7 @@ async function refreshNow(force) {
     lastLoadAt = Date.now();
     perfLog("essential data (token + load)", performance.now() - t0);
     S = data; me = S.me; setLive(true); setRoleHint(me.admin ? "admin" : "member");
+    if (auth.currentUser) saveCache(auth.currentUser.uid, data);
     $("boot").hidden = true; $("login").hidden = true; $("app").hidden = false;
     const wasLoading = $("app").classList.contains("loading");
     const sig = JSON.stringify({ ...data, timing: 0 }), changed = force || wasLoading || sig !== lastSig;
@@ -339,7 +364,7 @@ async function refreshNow(force) {
   } catch (e) {
     if (my !== seq || ep !== epoch) return;
     console.error(e);
-    if (/group list/i.test(e.message)) showLogin(e.message + ". Ask the admin to add this email.", true);
+    if (/group list/i.test(e.message)) { clearCache(); showLogin(e.message + ". Ask the admin to add this email.", true); }
     else {
       setLive(false);
       if (!me) { announce("Could not load data."); showLogin("Could not reach the sheet: " + e.message, false, true); }
@@ -934,6 +959,7 @@ async function sendMeal() {
   $("status").textContent = "Saving…";
   try {
     await track("Saving meal…", () => api("setMeal", { person: $("mealWho").value, date: $("mealDate").value, lunch: $("lunch").value, dinner: $("dinner").value }));
+    navigator.vibrate?.(15);
     resetMealDirty();
     $("status").textContent = "Saved to sheet ✓";
     refresh(true, "Updating…");
@@ -1044,3 +1070,6 @@ function renderAlerts() {
     });
   });
 }
+
+// ---------- Service worker: fast start and offline shell ----------
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => { /* ignore */ });
