@@ -22,6 +22,7 @@
 <meta name="theme-color" content="#000000">
 <title>খাদ্য তথ্য</title>
 <link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -46,6 +47,47 @@
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
 </head>
 <body>
+<div id="splash" role="img" aria-label="MEAL Sheets">
+  <div class="spInner">
+    <div class="spLogo">
+      <svg id="spMeal" class="spWord" viewBox="0 0 24 6" shape-rendering="crispEdges"></svg>
+      <svg id="spSheets" class="spWord sm" viewBox="0 0 36 6" shape-rendering="crispEdges"></svg>
+    </div>
+    <p class="spTag">add your daily meals and update groceries</p>
+    <div class="spBar"><b></b></div>
+  </div>
+</div>
+<script>
+(function(){
+var G={
+M:["10001","11011","10101","10001","10001"],
+E:["11111","10000","11110","10000","11111"],
+A:["01110","10001","11111","10001","10001"],
+L:["10000","10000","10000","10000","11111"],
+S:["01111","10000","01110","00001","11110"],
+h:["10000","10000","11110","10001","10001"],
+e:["01110","10001","11111","10000","01110"],
+t:["01000","11100","01000","01001","00110"],
+s:["01111","10000","01110","00001","11110"]};
+function word(w,fill,shade,t0){
+  var x=0,out="";
+  w.split("").forEach(function(c,i){
+    var m="",s="";
+    G[c].forEach(function(row,y){row.split("").forEach(function(v,k){
+      if(v==="1"){
+        s+='<rect x="'+(x+k+.5)+'" y="'+(y+.5)+'" width="1" height="1"/>';
+        m+='<rect x="'+(x+k)+'" y="'+y+'" width="1" height="1"/>';
+      }
+    });});
+    out+='<g class="ltr" style="--d:'+(t0+i*110)+'ms"><g fill="'+shade+'">'+s+'</g><g fill="'+fill+'">'+m+'</g></g>';
+    x+=6;
+  });
+  return out;
+}
+document.getElementById("spMeal").innerHTML=word("MEAL","#5fd35f","#17401a",0);
+document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",450);
+})();
+</script>
 <main>
   <h1 class="Fronttext" id="bookTitle">খাদ্য তথ্য</h1>
   <div class="date">Date: <b id="today"></b> <span id="live" class="live off">● offline</span></div>
