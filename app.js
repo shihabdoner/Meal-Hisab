@@ -6,6 +6,15 @@ import * as CFG from "./firebase-config.js";
 const firebaseConfig = CFG.firebaseConfig;
 
 const $ = id => document.getElementById(id);
+function hideSplash() {
+  const s = $("splash");
+  if (!s || s.dataset.gone) return;
+  s.dataset.gone = "1";
+  const wait = Math.max(0, 1800 - performance.now());   // let the animation finish first
+  setTimeout(() => { s.classList.add("out"); setTimeout(() => s.remove(), 500); }, wait);
+}
+setTimeout(hideSplash, 8000);                            // failsafe: never trap the user
+
 
 // ---------- Loading helpers / timing (console only) ----------
 const T_START = performance.now();
