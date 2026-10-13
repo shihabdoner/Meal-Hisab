@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<script>
+(function () {
+  function show(msg) {
+    var d = document.createElement("div");
+    d.style.cssText = "position:fixed;z-index:99999;left:0;right:0;bottom:0;background:#900;color:#fff;padding:8px;font:12px monospace;white-space:pre-wrap";
+    d.textContent = msg;
+    document.documentElement.appendChild(d);
+  }
+  window.addEventListener("error", function (e) {
+    show((e.message || "error") + " @ " + String(e.filename || "").split("/").pop() + ":" + (e.lineno || ""));
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    show("Promise: " + (e.reason && e.reason.message || e.reason));
+  });
+})();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>খাদ্য তথ্য</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="খাদ্য তথ্য">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
+<!-- Title font: loaded normally so the pixel title never flashes in a fallback face -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<!-- Interface fonts: non-blocking (print-media trick); Press Start 2P is already loaded above -->
+<link
+  rel="stylesheet"
+  media="print"
+  onload="this.media='all'"
+  href="https://fonts.googleapis.com/css2?family=Cascadia+Code:wght@400;700&family=Exo+2:wght@400;600;700&family=Merienda:wght@400;700&display=swap"
+>
+<noscript>
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Cascadia+Code:wght@400;700&family=Exo+2:wght@400;600;700&family=Merienda:wght@400;700&display=swap"
+  >
+</noscript>
+<link rel="stylesheet" href="style.css?v=20261013a">
+<link rel="modulepreload" href="app.js?v=20261013a">
+<link rel="modulepreload" href="firebase-config.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
+</head>
+<body>
+<div id="splash" role="img" aria-label="MEAL Sheets">
+  <div class="spInner">
+    <div class="spLogo">
+      <svg id="spMeal" class="spWord" viewBox="0 0 24 6" shape-rendering="crispEdges"></svg>
+      <svg id="spSheets" class="spWord sm" viewBox="0 0 36 6" shape-rendering="crispEdges"></svg>
+    </div>
+    <p class="spTag">add your daily meals and update groceries</p>
+    <div class="spBar"><b></b></div>
+  </div>
+</div>
+<div id="veil" aria-hidden="true">
+  <div class="veilBox">
+    <div class="spBar"><b></b></div>
+    <p class="spTag">loading…</p>
+  </div>
+</div>
+<script>
+(function(){
+var seen=false;
+try{seen=sessionStorage.getItem("splashSeen")==="1";}catch(e){}
+if(seen){
+  document.getElementById("splash").remove();
+  document.getElementById("veil").classList.add("show");       // dim immediately on reload
+  return;
+}
+try{sessionStorage.setItem("splashSeen","1");}catch(e){}
+var G={
+M:["10001","11011","10101","10001","10001"],
+E:["11111","10000","11110","10000","11111"],
+A:["01110","10001","11111","10001","10001"],
+L:["10000","10000","10000","10000","11111"],
+S:["01111","10000","01110","00001","11110"],
+h:["10000","10000","11110","10001","10001"],
+e:["01110","10001","11111","10000","01110"],
+t:["01000","11100","01000","01001","00110"],
+s:["01111","10000","01110","00001","11110"]};
+function word(w,fill,shade,t0){
+  var x=0,out="";
+  w.split("").forEach(function(c,i){
+    var m="",s="";
+    G[c].forEach(function(row,y){row.split("").forEach(function(v,k){
+      if(v==="1"){
+        s+='<rect x="'+(x+k+.5)+'" y="'+(y+.5)+'" width="1" height="1"/>';
+        m+='<rect x="'+(x+k)+'" y="'+y+'" width="1" height="1"/>';
+      }
+    });});
+    out+='<g class="ltr" style="--d:'+(t0+i*110)+'ms"><g fill="'+shade+'">'+s+'</g><g fill="'+fill+'">'+m+'</g></g>';
+    x+=6;
+  });
+  return out;
+}
+document.getElementById("spMeal").innerHTML=word("MEAL","#5fd35f","#17401a",0);
+document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",450);
+})();
+</script>
+<main>
+  <h1 class="Fronttext" id="bookTitle">খাদ্য তথ্য</h1>
+  <div class="date">Date: <b id="today"></b> <span id="live" class="live off">● offline</span></div>
+
+  <div id="setup" class="notice" hidden>No sheet is connected yet. Open <code>firebase-config.js</code> and paste the Apps Script web app URL(s).</div>
+  <div id="bootError" class="notice" hidden>The app could not start. Check your connection and reload the page.</div>
+
+  <!-- Sign-in -->
+  <section id="login" class="card" hidden>
+    <div class="k">Private group</div>
+    <p id="loginMsg" class="muted">Sign in with the Google account the admin added for you.</p>
+    <button id="gBtn">Sign in with Google</button>
+    <button id="deniedOut" hidden>Sign out</button>
+    <button id="retryBtn" hidden>Retry</button>
+  </section>
+
+  <!-- First-visit skeleton (now inside <main>, so it shares the page's width and padding) -->
+  <div id="boot" class="boot" aria-hidden="true">
+    <div class="skel skel-bar"></div>
+    <div class="grid">
+      <div class="skel skel-card wide"></div>
+      <div class="skel skel-card"></div><div class="skel skel-card"></div>
+      <div class="skel skel-card"></div><div class="skel skel-card"></div>
+    </div>
+    <div class="skel skel-section"></div>
+  </div>
+
+  <!-- App (signed-in members only) -->
+  <div id="app" hidden>
+    <div class="topbar">
+      <div class="topIdentity"><span id="me"></span><div class="month" id="monthLabel"></div></div>
+      <select id="adminPreview" class="adminPreview" aria-label="Preview a member's interface" hidden></select>
+      <span class="topBtns"><button id="refresh" title="Reload from sheet" aria-label="Reload from sheet">⟳</button> <button id="out">Sign out</button></span>
+    </div>
+    <div id="previewNotice" class="notice" hidden>Preview mode: this is the selected member’s interface. Editing is switched off while previewing.</div>
+
+    <div id="alertBar" class="alertBar" hidden></div>
+
+    <div class="slideBox" id="boxDash">
+      <div class="slideHead">
+        <button type="button" class="histToggle slideToggle" data-slide="dashBody" aria-expanded="true" aria-controls="dashBody"><span>Dashboard</span><span class="chev">▾</span></button>
+        <div class="printMini" role="group" aria-label="Print / Save as PDF">
+          <button type="button" data-p="my" title="Print my data">MY</button>
+          <button type="button" data-p="fund" title="Print fund data">FUND</button>
+          <button type="button" data-p="bazar" title="Print bazar data">BAZAR</button>
+          <button type="button" data-p="all" title="Print everything">ALL</button>
+        </div>
+      </div>
+      <div class="histBody open" id="dashBody"><div class="histInner"><div class="slidePad">
+
+        <div class="grid mine">
+          <div class="card wide" id="myDepCard"><div class="k">My deposit to fund</div><div class="v" id="myDep">৳0</div></div>
+          <div class="card" id="resFundCard"><div class="k">My residual in fund</div><div class="v" id="myResFund">৳0</div><div class="muted small" id="resFundNote"></div></div>
+          <div class="card" id="resCard"><div class="k">My residual in spending</div><div class="v" id="myRes">৳0</div><div class="muted small" id="resNote"></div></div>
+          <div class="card" id="dueFundCard"><div class="k">My due in fund</div><div class="v" id="myDueFund">৳0</div></div>
+          <div class="card" id="dueCard"><div class="k">My due in spending</div><div class="v" id="myDue">৳0</div></div>
+          <div class="card" id="lastFundCard"><div class="k">Most recent added fund</div><div class="v" id="lastFund">N/A</div><div class="muted small" id="lastFundMeta"></div></div>
+          <div class="card" id="lastFundMineCard"><div class="k">Most recent added fund by me</div><div class="v" id="lastFundMine">N/A</div><div class="muted small" id="lastFundMineMeta"></div></div>
+          <div class="card wide lastDateCard" id="lastDateCard"><div class="k">সর্বশেষ বাজারের তারিখ</div><div class="v" id="lastDate">N/A</div></div>
+        </div>
+
+        <div class="grid" style="margin-top:10px">
+          <div class="card wide" id="lastGroceryCard"><div class="k">Last grocery spending</div><div class="v" id="last">N/A</div><div class="muted lastd" id="lastd"></div></div>
+          <div class="card" id="fundCard"><div class="k">Total fund</div><div class="v" id="fund">৳0</div></div>
+          <div class="card" id="spentCard"><div class="k">Total spending</div><div class="v" id="spent">৳0</div></div>
+          <div class="card wide left" id="leftcard"><div class="k">Money left in the fund until today</div><div class="v" id="left">৳0</div></div>
+        </div>
+
+      </div></div></div>
+    </div>
+
+    <div class="slideBox" id="boxSections">
+      <button type="button" class="histToggle slideToggle" data-slide="secBody" aria-expanded="true" aria-controls="secBody"><span>Meal, Grocery, Fund</span><span class="chev">▾</span></button>
+      <div class="histBody open" id="secBody"><div class="histInner"><div class="slidePad">
+
+        <div class="sections">
+          <!-- ===== GROCERY ===== -->
+          <section class="sec secGrocery">
+            <h2 class="secTitle">Grocery <span class="alertDot" data-alert="spending" hidden></span></h2>
+            <details class="card" id="spendAddBox" hidden>
+              <summary>+ Add grocery spending</summary>
+              <form id="spForm" class="form">
+                <div class="fullRow">
+                  <label for="spDate" class="formLabel">Date (today or earlier — future dates are not allowed)</label>
+                  <input id="spDate" type="date" required>
+                </div>
+                <div id="spItems" class="spItems fullRow"></div>
+                <button type="button" id="spAddRow" class="plusBtn fullRow">＋ Add another বাজারকর্তা / time</button>
+                <button class="fullRow">Add</button>
+              </form>
+            </details>
+            <details class="card">
+              <summary>Grocery spending history</summary>
+              <div class="secAlert" data-alert="spending" hidden></div>
+              <div id="spList"></div>
+            </details>
+          </section>
+
+          <!-- ===== MEAL ===== -->
+          <section class="sec secMeal">
+            <h2 class="secTitle">Meal <span class="alertDot" data-alert="meal" hidden></span></h2>
+            <div class="secAlert" data-alert="meal" hidden></div>
+            <div class="card detailSection" id="mealSection">
+              <label for="mealWho">Select person</label>
+              <select id="mealWho"></select>
+              <div id="mealPerson" hidden>
+                <div class="mealEditor">
+                  <label for="mealDate">Entry date</label>
+                  <input id="mealDate" type="date" class="mdate">
+                  <div class="tablewrap">
+                    <table>
+                      <tr><th>দুপুর</th><th>রাত</th></tr>
+                      <tr><td><textarea id="lunch" aria-label="দুপুর"></textarea></td><td><textarea id="dinner" aria-label="রাত"></textarea></td></tr>
+                    </table>
+                  </div>
+                  <button id="mealSave" style="margin-top:8px" hidden>Save (add only)</button>
+                  <div class="status" id="status" role="status" aria-live="polite"></div>
+                </div>
+
+                <button type="button" id="mealHistToggle" class="histToggle" aria-expanded="false" aria-controls="mealHistBody">
+                  <span>Meal history</span><span class="chev">▾</span>
+                </button>
+                <div id="mealHistBody" class="histBody">
+                  <div class="histInner"><div id="mealHistory" class="historyList"></div></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== FUND ===== -->
+          <section class="sec secFund">
+            <h2 class="secTitle">Fund <span class="alertDot" data-alert="deposit" hidden></span></h2>
+            <div class="secAlert" data-alert="deposit" hidden></div>
+            <div class="card detailSection" id="fundSection">
+              <label for="fundWho">Select person</label>
+              <select id="fundWho"></select>
+              <div id="fundPerson" hidden>
+                <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
+                <div style="margin-top:10px"><b>জমাদানের তথ্য</b></div>
+                <div id="deps" class="muted"></div>
+                <form id="depForm" class="form" hidden>
+                  <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" aria-label="Deposit amount" required>
+                  <input id="depDate" type="date" aria-label="Deposit date" required>
+                  <button>+ Add deposit</button>
+                </form>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+      </div></div></div>
+    </div>
+
+    <h2 class="flick" id="sheetHead">Sheet view</h2>
+    <div id="bookBar" class="bookBar" hidden><label for="bookSel">Sheet</label><select id="bookSel" aria-label="Choose the spreadsheet"></select></div>
+    <div id="sheetBanner" class="imgBanner" aria-hidden="true"></div>
+
+    <details class="card sheet" id="sheetMeals"><summary>Meals (per day) <span class="alertDot" data-alert="meal" hidden></span></summary><div class="secAlert" data-alert="meal" hidden></div><div id="tblMeals" class="tablewrap"></div></details>
+    <details class="card sheet" id="sheetSpending"><summary>Grocery spending <span class="alertDot" data-alert="spending" hidden></span></summary><div class="secAlert" data-alert="spending" hidden></div><div id="tblSpending" class="tablewrap"></div></details>
+    <details class="card sheet" id="sheetDeposits"><summary>Deposits <span class="alertDot" data-alert="deposit" hidden></span></summary><div class="secAlert" data-alert="deposit" hidden></div><div id="tblDeposits" class="tablewrap"></div></details>
+
+    <div class="slideBox adminOnly" id="boxAdmin" hidden>
+      <button type="button" class="histToggle slideToggle" data-slide="adminBody" aria-expanded="false" aria-controls="adminBody"><span>Member permissions</span><span class="chev">▾</span></button>
+      <div class="histBody" id="adminBody"><div class="histInner"><div class="slidePad">
+        <section class="card" id="adminPanel">
+
+          <div class="muted" style="margin-bottom:8px">Add each person's Google email. “Make admin” hands over admin to that person and you become a regular member.</div>
+          <div id="memberList"></div>
+          <div class="permissionBox">
+            <h3>Member permissions</h3>
+            <label for="permPerson">Persons</label>
+            <select id="permPerson"></select>
+            <div id="permEditor" hidden>
+              <div class="permGroup"><b>Select who's</b>
+                <div class="muted small">Pick a person this member may add data for. Their permissions appear below.</div>
+                <div id="permWho" class="whoList"></div>
+                <div id="permSummary" class="muted small"></div>
+              </div>
+              <div class="permGroup" id="permTargetBox" hidden><b id="permTargetTitle">Permissions</b>
+                <label class="chip"><input type="checkbox" id="permTFunds"> Funds (add deposits)</label>
+                <label class="chip"><input type="checkbox" id="permTMeals"> Meal details (add lunch / dinner)</label>
+              </div>
+              <div class="permGroup"><b>Grocery details</b>
+                <label class="chip"><input type="checkbox" id="permGrocery"> Can add grocery spending (and edit the latest entry they added)</label>
+              </div>
+              <div class="permGroup"><b>Sheet view</b>
+                <div class="muted small">Which sheet tables this member can see.</div>
+                <div id="permViewSheets" class="permChips"></div>
+              </div>
+              <div class="permGroup"><b>Dashboard cards</b>
+                <div class="muted small">Unticked cards disappear from this member's screen.</div>
+                <div id="permViewCards" class="permChips"></div>
+              </div>
+              <button id="savePerms">Save permissions</button>
+            </div>
+          </div>
+        </section>
+      </div></div></div>
+    </div>
+
+</main>
+<div id="loadStatus" class="srOnly" role="status" aria-live="polite"></div>
+<button id="fab" type="button" aria-label="Reload" title="Reload">⟳</button>
+
+<div id="toast" role="status" aria-live="polite" aria-hidden="true">
+  <div class="tsBar"><b></b></div>
+  <span id="toastTxt">Loading…</span>
+</div>
+<div id="report"></div>
+<script type="module" src="app.js?v=20261013a"
+  onerror="document.getElementById('boot').hidden=true;document.getElementById('bootError').hidden=false"></script>
+</body>
+</html>
