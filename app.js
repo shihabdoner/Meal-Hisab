@@ -453,7 +453,9 @@ function applyViews() {
   $("sheetHead").hidden = !["sheetMeals", "sheetSpending", "sheetDeposits"].some(canSee);
   const pa = { my: ["myDep", "resid", "due"].some(canSee), fund: ["totalFund", "totalSpent", "left"].every(canSee), bazar: canSee("sheetSpending") };
   document.querySelectorAll("[data-p]").forEach(b => { b.hidden = b.dataset.p === "all" ? !(pa.my && pa.fund && pa.bazar) : !pa[b.dataset.p]; });
-  document.querySelector(".printBar").hidden = ![...document.querySelectorAll("[data-p]")].some(b => !b.hidden);
+    document.querySelector(".printMini").hidden = ![...document.querySelectorAll("[data-p]")].some(b => !b.hidden);
+  $("boxDash").hidden = [...document.querySelectorAll("#dashBody .grid")].every(g => g.hidden) && document.querySelector(".printMini").hidden;
+
 }
 
 // ---------- Numbers ----------
@@ -486,6 +488,22 @@ function statsFor(S, name, email) {
 
 const dateChip = d => { const b = document.createElement("b"); b.className = "sp-date"; b.textContent = d; return b; };
 const timeChip = t => { const b = document.createElement("b"); b.className = "timeChip"; b.textContent = "🕒 " + t; return b; };
+const dayChip = d => { const b = document.createElement("b"); b.className = "day-chip"; b.textContent = new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" }); return b; };
+const openDates = new Set();                                 // opened date toggles survive the refresh
+function dateToggleEl(key, d, sum, body) {
+  const box = document.createElement("div"); box.className = "dtItem";
+  const head = document.createElement("button"); head.type = "button"; head.className = "dtHead";
+  const s = document.createElement("span"); s.className = "dtSum"; s.textContent = sum || "";
+  const chev = document.createElement("span"); chev.className = "chev"; chev.textContent = "▾";
+  head.append(dateChip(d), dayChip(d), s, chev);
+  const wrap = document.createElement("div"); wrap.className = "histBody";
+  const inner = document.createElement("div"); inner.className = "histInner"; inner.appendChild(body); wrap.appendChild(inner);
+  const set = o => { wrap.classList.toggle("open", o); head.setAttribute("aria-expanded", String(o)); };
+  set(openDates.has(key));
+  head.onclick = () => { const o = !wrap.classList.contains("open"); o ? openDates.add(key) : openDates.delete(key); set(o); };
+  box.append(head, wrap);
+  return box;
+}
 
 // ---------- "See more" slides ----------
 // target slides open / closed (max-height animation) with a small button under it
@@ -588,8 +606,14 @@ function renderHistories() {
   const list = (S.depositLog || []).filter(e => e.person === who).sort((a, b) => b.date.localeCompare(a.date) || (b.time || "").localeCompare(a.time || ""));
   const dl = $("deps"); dl.textContent = "";
   if (!list.length) dl.textContent = "এখনো কোনো জমা নেই";
-  const dfrag = document.createDocumentFragment();
-  list.forEach(e => dfrag.appendChild(depositRowEl(e, who, latest)));
+    const dfrag = document.createDocumentFragment();
+  const byD = {};
+  list.forEach(e => (byD[e.date] = byD[e.date] || []).push(e));
+  Object.keys(byD).sort().reverse().forEach(d => {
+    const body = document.createElement("div"); body.className = "dtBody";
+    byD[d].forEach(e => body.appendChild(depositRowEl(e, who, latest)));
+    dfrag.appendChild(dateToggleEl(`f:${who}:${d}`, d, fmt(byD[d].reduce((t, e) => t + num(e.amount), 0)), body));
+  });
   dl.appendChild(dfrag);
 }
 
@@ -607,20 +631,17 @@ function amountEl(text) { const v = document.createElement("b"); v.className = "
 
 // all purchases of one date. More than 3: the rest slide open under "See N more".
 function spendDateEl(d, list) {
-  const box = document.createElement("div"); box.className = "spDay";
-  const head = document.createElement("div"); head.className = "spDayHead";
-  head.appendChild(dateChip(d));
-  head.append(` ${list.length} purchase${list.length > 1 ? "s" : ""} · ${fmt(list.reduce((t, e) => t + num(e.amount), 0))}`);
-  box.appendChild(head);
+  const body = document.createElement("div"); body.className = "dtBody";
   const rows = list.map(spendingRowEl), LIM = 3;
-  rows.slice(0, LIM).forEach(r => box.appendChild(r));
+  rows.slice(0, LIM).forEach(r => body.appendChild(r));
   if (rows.length > LIM) {
     const slide = document.createElement("div"); slide.className = "slide";
     rows.slice(LIM).forEach(r => slide.appendChild(r));
-    box.append(slide, makeSlide(slide, "0px", "day:" + d, `See ${rows.length - LIM} more ▾`, "See less ▴"));
+    body.append(slide, makeSlide(slide, "0px", "day:" + d, `See ${rows.length - LIM} more ▾`, "See less ▴"));
   }
-  return box;
+  return dateToggleEl("g:" + d, d, `${list.length} purchase${list.length > 1 ? "s" : ""} · ${fmt(list.reduce((t, e) => t + num(e.amount), 0))}`, body);
 }
+
 function spendingRowEl(e) {
   const r = document.createElement("div"); r.className = "row spendingRow";
   const a = document.createElement("div"); a.className = "spendingDescription";
@@ -728,14 +749,13 @@ function renderMealHistory(name) {
   rows.sort((a, b) => b.date.localeCompare(a.date));
   if (!rows.length) { box.textContent = "No meal entries yet"; return; }
   const frag = document.createDocumentFragment();
-  rows.forEach(e => {
+    rows.forEach(e => {
+    const body = document.createElement("div"); body.className = "dtBody";
     const r = document.createElement("div"); r.className = "row mealHistoryRow";
-    const a = document.createElement("span"); a.className = "spendingDescription"; a.appendChild(dateChip(e.date));
-    const parts = [];
-    if (e.lunch || e.dinner) parts.push(`দুপুর: ${e.lunch || "—"} · রাত: ${e.dinner || "—"}`);
-    if (parts.length) a.append(" · " + parts.join(" · "));
-    r.append(a, e.count !== "" ? amountEl(`${e.count} meal${num(e.count) === 1 ? "" : "s"}`) : document.createElement("span"));
-    frag.appendChild(r);
+    const t = document.createElement("span"); t.className = "spendingDescription";
+    t.textContent = (e.lunch || e.dinner) ? `দুপুর: ${e.lunch || "—"}\nরাত: ${e.dinner || "—"}` : "No details";
+    r.appendChild(t); body.appendChild(r);
+    frag.appendChild(dateToggleEl(`m:${name}:${e.date}`, e.date, e.count !== "" ? `${e.count} meal${num(e.count) === 1 ? "" : "s"}` : "", body));
   });
   box.appendChild(frag);
 }
@@ -1075,6 +1095,21 @@ function renderAlerts() {
     });
   });
 }
+// ---------- Toggle slide boxes + pixel printer icons ----------
+document.querySelectorAll("[data-slide]").forEach(btn => btn.onclick = () => {
+  btn.setAttribute("aria-expanded", String($(btn.dataset.slide).classList.toggle("open")));
+});
+const PRINTER = ["..####..", "..#..#..", "########", "#......#", "########", ".#....#.", ".######."];
+document.querySelectorAll(".printMini button").forEach(b => {
+  const ns = "http://www.w3.org/2000/svg", s = document.createElementNS(ns, "svg");
+  s.setAttribute("viewBox", "0 0 8 7"); s.setAttribute("class", "pxi"); s.setAttribute("shape-rendering", "crispEdges"); s.setAttribute("aria-hidden", "true");
+  PRINTER.forEach((row, y) => [...row].forEach((c, x) => {
+    if (c !== "#") return;
+    const r = document.createElementNS(ns, "rect");
+    r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", 1); r.setAttribute("height", 1); s.appendChild(r);
+  }));
+  b.prepend(s);
+});
 
 // ---------- Service worker: fast start and offline shell ----------
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => { /* ignore */ });
