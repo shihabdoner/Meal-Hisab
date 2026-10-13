@@ -697,3 +697,22 @@ body.isMember #app>#boxSections{order:1}
   padding:1px 6px;font-weight:700;font-size:.78rem}
 body.isMember .day-chip{background:#3a3226;color:#f0d68a;border-color:#6e5d33}
 @media(prefers-reduced-motion:reduce){.dtHead .chev{transition:none}}
+
+/* ---- Image backgrounds (dimmed so text stays the focus) ---- */
+
+/* 1. Whole page: building, fixed behind everything */
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(rgba(0,0,0,.72),rgba(0,0,0,.72)),url("img/bg-building.jpg") center bottom/cover no-repeat}
+
+/* 2. Print buttons: palm-tree scene, scrolls away with the buttons */
+.printMini{padding:6px;border-radius:8px;
+  background:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.35)),url("img/print-river.jpg") center/cover}
+
+/* 3. Refresh + Sign out: lemons */
+.topBtns{display:inline-flex;gap:6px;align-items:center;padding:6px 8px;border-radius:8px;
+  background:linear-gradient(rgba(0,0,0,.4),rgba(0,0,0,.4)),url("img/top-lemons.jpg") center/cover}
+
+/* 4. Banner under the sheet dropdown: mountains */
+.imgBanner{height:90px;margin:0 0 12px;border-radius:8px;border:1px solid #2f3a33;
+  background:linear-gradient(rgba(0,0,0,.45),rgba(0,0,0,.45)),url("img/sheet-mountains.jpg") center/cover}
+body:not(.isAdmin) .imgBanner,#bookBar[hidden]+.imgBanner{display:none}
