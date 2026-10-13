@@ -1,4 +1,4 @@
-const V = "khaddo-v2";   // rename (khaddo-v2, v3 …) to force everyone onto fresh files
+const V = "khaddo-v3";   // rename (khaddo-v2, v3 …) to force everyone onto fresh files
 const SHELL = ["./", "index.html", "style.css", "app.js", "firebase-config.js", "manifest.json"];
 
 self.addEventListener("install", e => {
