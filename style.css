@@ -668,5 +668,32 @@ body.isMember #fab{background:rgba(20,24,21,.94);color:#8fd1a6;border-color:#2f3
 body:has(#app[hidden]) #fab{display:none}   /* hidden on the sign-in screen */
 @media print{#fab{display:none!important}}
 @media(prefers-reduced-motion:reduce){#fab.spin{animation:none}}
+/* ---- Toggle slide boxes ---- */
+.slideBox{margin:14px 0}
+.slidePad{padding-top:10px}
+.slideHead{display:flex;align-items:center;gap:8px}
+.slideHead .slideToggle{flex:1;margin-top:0}
+.slideToggle{margin-top:0;font-family:"Exo 2",sans-serif;font-weight:700;font-size:1rem}
+body.isMember #app>#boxSections{order:1}
 
+/* pixel print buttons beside the Dashboard heading */
+.printMini{display:flex;gap:4px;flex-shrink:0}
+.printMini button{display:inline-flex;align-items:center;gap:4px;padding:6px 7px;min-height:32px;border-radius:4px;
+  font:.45rem/1 "Press Start 2P",monospace;letter-spacing:0}
+.pxi{width:10px;height:9px;fill:currentColor;flex:none}
+@media(max-width:400px){.printMini .pxi{display:none}.printMini button{padding:6px 5px}}
 
+/* ---- Per-date toggles (grocery / fund / meal history) ---- */
+.dtItem{margin-bottom:6px}
+.dtHead{display:flex;align-items:center;gap:6px;width:100%;text-align:left;padding:6px 8px;border-radius:8px;
+  background:#1f1e1c;color:#ddd;border:1px dashed var(--ac,#09ff00);font-family:"Exo 2",sans-serif}
+.dtHead .chev{transition:transform .3s ease;margin-left:4px}
+.dtHead[aria-expanded="false"] .chev{transform:rotate(-90deg)}
+.dtSum{margin-left:auto;font-size:.8rem;color:#9a9a9a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtBody{padding-top:6px}
+.dtHead .sp-date{margin-right:0}
+/* the day name gets its own exclusive highlight */
+.day-chip{display:inline-block;color:#000;background:#ffd24a;border:1px solid #ffb300;border-radius:4px;
+  padding:1px 6px;font-weight:700;font-size:.78rem}
+body.isMember .day-chip{background:#3a3226;color:#f0d68a;border-color:#6e5d33}
+@media(prefers-reduced-motion:reduce){.dtHead .chev{transition:none}}
