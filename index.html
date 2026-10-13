@@ -45,8 +45,8 @@
     href="https://fonts.googleapis.com/css2?family=Cascadia+Code:wght@400;700&family=Exo+2:wght@400;600;700&family=Merienda:wght@400;700&family=Press+Start+2P&display=swap"
   >
 </noscript>
-<link rel="stylesheet" href="style.css?v=20261011a">
-<link rel="modulepreload" href="app.js?v=20261011a">
+<link rel="stylesheet" href="style.css?v=20261011b">
+<link rel="modulepreload" href="app.js?v=20261011b">
 <link rel="modulepreload" href="firebase-config.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
@@ -127,7 +127,8 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",
     <div class="topbar">
       <div class="topIdentity"><span id="me"></span><div class="month" id="monthLabel"></div></div>
       <select id="adminPreview" class="adminPreview" aria-label="Preview a member's interface" hidden></select>
-      <span><button id="refresh" title="Reload from sheet">⟳</button> <button id="out">Sign out</button></span>
+      <span class="topBtns"><button id="refresh" title="Reload from sheet">⟳</button> <button id="out">Sign out</button></span>
+
     </div>
     <div id="previewNotice" class="notice" hidden>Preview mode: this is the selected member’s interface. Editing is switched off while previewing.</div>
 
@@ -253,6 +254,8 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",
 
     <h2 class="flick" id="sheetHead">Sheet view</h2>
     <div id="bookBar" class="bookBar" hidden><label for="bookSel">Sheet</label><select id="bookSel" aria-label="Choose the spreadsheet"></select></div>
+    <div id="sheetBanner" class="imgBanner" aria-hidden="true"></div>
+
     <details class="card sheet" id="sheetMeals"><summary>Meals (per day) <span class="alertDot" data-alert="meal" hidden></span></summary><div class="secAlert" data-alert="meal" hidden></div><div id="tblMeals" class="tablewrap"></div></details>
     <details class="card sheet" id="sheetSpending"><summary>Grocery spending <span class="alertDot" data-alert="spending" hidden></span></summary><div class="secAlert" data-alert="spending" hidden></div><div id="tblSpending" class="tablewrap"></div></details>
     <details class="card sheet" id="sheetDeposits"><summary>Deposits <span class="alertDot" data-alert="deposit" hidden></span></summary><div class="secAlert" data-alert="deposit" hidden></div><div id="tblDeposits" class="tablewrap"></div></details>
@@ -315,7 +318,7 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",
   <span id="toastTxt">Loading…</span>
 </div>
 <div id="report"></div>
-<script type="module" src="app.js?v=20261011a"
+<script type="module" src="app.js?v=20261011b"
   onerror="document.getElementById('boot').hidden=true;document.getElementById('bootError').hidden=false"></script>
 </body>
 </html>
