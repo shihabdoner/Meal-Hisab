@@ -18,8 +18,33 @@
   });
 })();
 </script>
+<meta name="color-scheme" content="dark light">
+<script>
+/* Theme: dark by default. Choices: dark / light / auto (follows the device). Runs before first paint. */
+(function(){
+  var KEY="khaddoTheme", root=document.documentElement, mq=window.matchMedia("(prefers-color-scheme: dark)");
+  function get(){try{return localStorage.getItem(KEY)||"dark";}catch(e){return "dark";}}
+  function set(m){try{localStorage.setItem(KEY,m);}catch(e){}}
+  function apply(m){
+    var t=m==="auto"?(mq.matches?"dark":"light"):m;
+    root.setAttribute("data-theme",t); root.setAttribute("data-theme-mode",m);
+    var tc=document.querySelector('meta[name="theme-color"]'); if(tc) tc.setAttribute("content",t==="dark"?"#121018":"#B49AE8");
+    document.querySelectorAll("[data-theme-set]").forEach(function(b){b.setAttribute("aria-pressed",String(b.getAttribute("data-theme-set")===m));});
+  }
+  apply(get());
+  document.addEventListener("DOMContentLoaded",function(){
+    apply(get());
+    document.addEventListener("click",function(e){
+      var b=e.target.closest&&e.target.closest("[data-theme-set]"); if(!b) return;
+      var m=b.getAttribute("data-theme-set"); set(m); apply(m);
+    });
+  });
+  var onChange=function(){ if(get()==="auto") apply("auto"); };
+  if(mq.addEventListener) mq.addEventListener("change",onChange); else if(mq.addListener) mq.addListener(onChange);
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#B49AE8">
+<meta name="theme-color" content="#121018">
 <title>খাদ্য তথ্য</title>
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -45,8 +70,8 @@
     href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&display=swap"
   >
 </noscript>
-<link rel="stylesheet" href="style.css?v=20261014d">
-<link rel="modulepreload" href="app.js?v=20261014d">
+<link rel="stylesheet" href="style.css?v=20261014e">
+<link rel="modulepreload" href="app.js?v=20261014e">
 <link rel="modulepreload" href="firebase-config.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
@@ -108,6 +133,14 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#FF7417","#080808",
 })();
 </script>
 <main>
+  <div class="themeBar">
+    <span id="themeLbl">Theme</span>
+    <div class="themeSeg" role="group" aria-labelledby="themeLbl">
+      <button type="button" data-theme-set="dark" aria-pressed="true">☾ Dark</button>
+      <button type="button" data-theme-set="light" aria-pressed="false">☀ Light</button>
+      <button type="button" data-theme-set="auto" aria-pressed="false">Auto</button>
+    </div>
+  </div>
   <header class="brand">
     <svg class="decor" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path d="M20 3 25 15 37 20 25 25 20 37 15 25 3 20 15 15Z" fill="#FFD166" stroke="#080808" stroke-width="2.5" stroke-linejoin="round"/></svg>
     <h1 class="Fronttext" id="bookTitle">খাদ্য তথ্য</h1>
@@ -328,7 +361,7 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#FF7417","#080808",
   <span id="toastTxt">Loading…</span>
 </div>
 <div id="report"></div>
-<script type="module" src="app.js?v=20261014d"
+<script type="module" src="app.js?v=20261014e"
   onerror="document.getElementById('boot').hidden=true;document.getElementById('bootError').hidden=false"></script>
 </body>
 </html>
