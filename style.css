@@ -626,3 +626,18 @@ details.card[open]>summary{padding-bottom:var(--s-2);border-bottom:var(--bw-thin
   .slideBox>.histBody>.histInner>.slidePad{margin-left:4px;padding-left:8px}
   .slideBox .slideToggle{font-size:var(--fs-md)}
 }
+
+/* =====================================================================
+   15  SPENDING: Add Grocery / Add Utility picker
+   ===================================================================== */
+.pickRow{display:grid;grid-template-columns:1fr 1fr;gap:var(--s-2);margin-bottom:var(--s-3)}
+.pickBtn{display:flex;align-items:center;justify-content:center;gap:var(--s-2);--btn-bg:var(--white);--btn-bg-h:var(--paper-2);--btn-fg:var(--ac-ink);
+  font-size:var(--fs-md);border-radius:var(--r-md)}
+.pickBtn[aria-expanded="true"]{--btn-bg:var(--ac);--btn-bg-h:var(--ac);--btn-fg:var(--ink)}
+.pickBtn .chev{transition:transform var(--t-med) ease}
+.pickBtn[aria-expanded="false"] .chev{transform:rotate(-90deg)}
+.pickPad{padding-top:var(--s-1)}
+.utilToggle{--btn-bg:var(--paper-2);--btn-fg:var(--ac-ink);margin-top:0;margin-bottom:var(--s-2)}
+.utilToggle[aria-expanded="true"]{--btn-bg:var(--ac);--btn-fg:var(--ink)}
+.utilPad{padding:var(--s-3);margin-bottom:var(--s-2);background:var(--white);border:var(--bw-thin) dashed var(--line);border-radius:var(--r-md);font-weight:700}
+@media(max-width:440px){.pickBtn{font-size:var(--fs-sm);padding:var(--s-2)}}
