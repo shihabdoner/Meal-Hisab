@@ -252,7 +252,7 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#FF7417","#080808",
 
             <!-- Add Utility: two ordinary toggle-slide buttons -->
             <div class="histBody" id="pickUtility"><div class="histInner"><div class="pickPad">
-              <button type="button" class="histToggle utilToggle" data-slide="utilKhaar" aria-expanded="false" aria-controls="utilKhaar"><span>KHAAR Taka</span><span class="chev">▾</span></button>
+              <button type="button" class="histToggle utilToggle" data-slide="utilKhaar" aria-expanded="false" aria-controls="utilKhaar"><span>KHALAR Taka</span><span class="chev">▾</span></button>
               <div class="histBody" id="utilKhaar"><div class="histInner"><div class="utilPad muted">Nothing here yet.</div></div></div>
 
               <button type="button" class="histToggle utilToggle" data-slide="utilGas" aria-expanded="false" aria-controls="utilGas"><span>Gass BILL</span><span class="chev">▾</span></button>
@@ -298,16 +298,16 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#FF7417","#080808",
             <div class="card detailSection" id="fundSection">
               <label for="fundWho">Select person</label>
               <select id="fundWho"></select>
-              <div id="fundPerson" hidden>
-                <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
-                <div style="margin-top:10px"><b>জমাদানের তথ্য</b></div>
-                <div id="deps" class="muted"></div>
-                <form id="depForm" class="form" hidden>
-                  <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" aria-label="Deposit amount" required>
-                  <input id="depDate" type="date" aria-label="Deposit date" required>
-                  <button>+ Add deposit</button>
-                </form>
-              </div>
+             <div id="fundPerson" hidden>
+  <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
+  <form id="depForm" class="form" hidden>
+    <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" aria-label="Deposit amount" required>
+    <input id="depDate" type="date" aria-label="Deposit date" required>
+    <button>+ Add deposit</button>
+  </form>
+  <button type="button" class="histToggle depsToggle" data-slide="depsBody" aria-expanded="false" aria-controls="depsBody"><span>জমাদানের তথ্য</span><span class="chev">▾</span></button>
+  <div class="histBody" id="depsBody"><div class="histInner"><div id="deps" class="muted"></div></div></div>
+</div>
             </div>
           </section>
 
@@ -335,8 +335,11 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#FF7417","#080808",
       <div class="histBody" id="adminBody"><div class="histInner"><div class="slidePad">
         <section class="card" id="adminPanel">
 
-          <div class="muted" style="margin-bottom:8px">Add each person's Google email. “Make admin” hands over admin to that person and you become a regular member.</div>
-          <div id="memberList"></div>
+          <button type="button" class="histToggle memberToggle" data-slide="memberBody" aria-expanded="false" aria-controls="memberBody"><span>Add/Edit member</span><span class="chev">▾</span></button>
+<div class="histBody" id="memberBody"><div class="histInner"><div class="memberPad">
+  <div class="muted" style="margin-bottom:8px">Add each person's Google email. “Make admin” hands over admin to that person and you become a regular member.</div>
+  <div id="memberList"></div>
+</div></div></div>
           <div class="permissionBox">
             <h3>Member permissions</h3>
             <label for="permPerson">Persons</label>
