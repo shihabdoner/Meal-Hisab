@@ -149,7 +149,7 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",
 
     <div class="slideBox" id="boxDash">
       <div class="slideHead">
-        <button type="button" class="histToggle slideToggle" data-slide="dashBody" aria-expanded="true" aria-controls="dashBody"><span>Dashboard</span><span class="chev">▾</span></button>
+        <button type="button" class="histToggle slideToggle" data-slide="dashBody" aria-expanded="false" aria-controls="dashBody"><span>Dashboard</span><span class="chev">▾</span></button>
         <div class="printMini" role="group" aria-label="Print / Save as PDF">
           <button type="button" data-p="my" title="Print my data">MY</button>
           <button type="button" data-p="fund" title="Print fund data">FUND</button>
@@ -181,7 +181,7 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",
     </div>
 
     <div class="slideBox" id="boxSections">
-      <button type="button" class="histToggle slideToggle" data-slide="secBody" aria-expanded="true" aria-controls="secBody"><span>Meal, Grocery, Fund</span><span class="chev">▾</span></button>
+      <button type="button" class="histToggle slideToggle" data-slide="secBody" aria-expanded="false" aria-controls="secBody"><span>Meal, Grocery, Fund</span><span class="chev">▾</span></button>
       <div class="histBody open" id="secBody"><div class="histInner"><div class="slidePad">
 
         <div class="sections">
@@ -263,13 +263,19 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",
       </div></div></div>
     </div>
 
-    <h2 class="flick" id="sheetHead">Sheet view</h2>
+    <div class="slideBox" id="boxSheet">
+  <button type="button" class="histToggle slideToggle" data-slide="sheetBody" aria-expanded="false" aria-controls="sheetBody"><span>Sheet view</span><span class="chev">▾</span></button>
+  <div class="histBody" id="sheetBody"><div class="histInner"><div class="slidePad">
+
     <div id="bookBar" class="bookBar" hidden><label for="bookSel">Sheet</label><select id="bookSel" aria-label="Choose the spreadsheet"></select></div>
     <div id="sheetBanner" class="imgBanner" aria-hidden="true"></div>
 
     <details class="card sheet" id="sheetMeals"><summary>Meals (per day) <span class="alertDot" data-alert="meal" hidden></span></summary><div class="secAlert" data-alert="meal" hidden></div><div id="tblMeals" class="tablewrap"></div></details>
     <details class="card sheet" id="sheetSpending"><summary>Grocery spending <span class="alertDot" data-alert="spending" hidden></span></summary><div class="secAlert" data-alert="spending" hidden></div><div id="tblSpending" class="tablewrap"></div></details>
     <details class="card sheet" id="sheetDeposits"><summary>Deposits <span class="alertDot" data-alert="deposit" hidden></span></summary><div class="secAlert" data-alert="deposit" hidden></div><div id="tblDeposits" class="tablewrap"></div></details>
+
+  </div></div></div>
+</div>
 
     <div class="slideBox adminOnly" id="boxAdmin" hidden>
       <button type="button" class="histToggle slideToggle" data-slide="adminBody" aria-expanded="false" aria-controls="adminBody"><span>Member permissions</span><span class="chev">▾</span></button>
