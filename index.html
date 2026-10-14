@@ -70,8 +70,8 @@
     href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&display=swap"
   >
 </noscript>
-<link rel="stylesheet" href="style.css?v=20261014f">
-<link rel="modulepreload" href="app.js?v=20261014f">
+<link rel="stylesheet" href="style.css?v=20261014g">
+<link rel="modulepreload" href="app.js?v=20261014g">
 <link rel="modulepreload" href="firebase-config.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
@@ -216,30 +216,48 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#FF7417","#080808",
     </div>
 
     <div class="slideBox" id="boxSections">
-      <button type="button" class="histToggle slideToggle" data-slide="secBody" aria-expanded="false" aria-controls="secBody"><span>Meal, Grocery, Fund</span><span class="chev">▾</span></button>
+      <button type="button" class="histToggle slideToggle" data-slide="secBody" aria-expanded="false" aria-controls="secBody"><span>Meal, Spending, Fund</span><span class="chev">▾</span></button>
       <div class="histBody" id="secBody"><div class="histInner"><div class="slidePad">
 
         <div class="sections">
-          <!-- ===== GROCERY ===== -->
+          <!-- ===== SPENDING (was Grocery) ===== -->
           <section class="sec secGrocery">
-            <h2 class="secTitle">Grocery <span class="alertDot" data-alert="spending" hidden></span></h2>
-            <details class="card" id="spendAddBox" hidden>
-              <summary>+ Add grocery spending</summary>
-              <form id="spForm" class="form">
-                <div class="fullRow">
-                  <label for="spDate" class="formLabel">Date (today or earlier — future dates are not allowed)</label>
-                  <input id="spDate" type="date" required>
-                </div>
-                <div id="spItems" class="spItems fullRow"></div>
-                <button type="button" id="spAddRow" class="plusBtn fullRow">＋ Add another বাজারকর্তা / time</button>
-                <button class="fullRow">Add</button>
-              </form>
-            </details>
-            <details class="card">
-              <summary>Grocery spending history</summary>
-              <div class="secAlert" data-alert="spending" hidden></div>
-              <div id="spList"></div>
-            </details>
+            <h2 class="secTitle">Spending <span class="alertDot" data-alert="spending" hidden></span></h2>
+
+            <div class="pickRow" role="group" aria-label="Spending type">
+              <button type="button" class="pickBtn" data-pick="pickGrocery" aria-expanded="false" aria-controls="pickGrocery"><span>Add Grocery</span><span class="chev">▾</span></button>
+              <button type="button" class="pickBtn" data-pick="pickUtility" aria-expanded="false" aria-controls="pickUtility"><span>Add Utility</span><span class="chev">▾</span></button>
+            </div>
+
+            <!-- Add Grocery: everything the old Grocery section held -->
+            <div class="histBody" id="pickGrocery"><div class="histInner"><div class="pickPad">
+              <details class="card" id="spendAddBox" hidden>
+                <summary>+ Add grocery spending</summary>
+                <form id="spForm" class="form">
+                  <div class="fullRow">
+                    <label for="spDate" class="formLabel">Date (today or earlier — future dates are not allowed)</label>
+                    <input id="spDate" type="date" required>
+                  </div>
+                  <div id="spItems" class="spItems fullRow"></div>
+                  <button type="button" id="spAddRow" class="plusBtn fullRow">＋ Add another বাজারকর্তা / time</button>
+                  <button class="fullRow">Add</button>
+                </form>
+              </details>
+              <details class="card">
+                <summary>Grocery spending history</summary>
+                <div class="secAlert" data-alert="spending" hidden></div>
+                <div id="spList"></div>
+              </details>
+            </div></div></div>
+
+            <!-- Add Utility: two ordinary toggle-slide buttons -->
+            <div class="histBody" id="pickUtility"><div class="histInner"><div class="pickPad">
+              <button type="button" class="histToggle utilToggle" data-slide="utilKhaar" aria-expanded="false" aria-controls="utilKhaar"><span>KHAAR Taka</span><span class="chev">▾</span></button>
+              <div class="histBody" id="utilKhaar"><div class="histInner"><div class="utilPad muted">Nothing here yet.</div></div></div>
+
+              <button type="button" class="histToggle utilToggle" data-slide="utilGas" aria-expanded="false" aria-controls="utilGas"><span>Gass BILL</span><span class="chev">▾</span></button>
+              <div class="histBody" id="utilGas"><div class="histInner"><div class="utilPad muted">Nothing here yet.</div></div></div>
+            </div></div></div>
           </section>
 
           <!-- ===== MEAL ===== -->
@@ -361,7 +379,23 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#FF7417","#080808",
   <span id="toastTxt">Loading…</span>
 </div>
 <div id="report"></div>
-<script type="module" src="app.js?v=20261014f"
+<script>
+/* Add Grocery / Add Utility: opening one slides the other shut; tapping the open one closes it */
+(function(){
+  var btns=document.querySelectorAll("[data-pick]");
+  btns.forEach(function(b){
+    b.addEventListener("click",function(){
+      var willOpen=b.getAttribute("aria-expanded")!=="true";
+      btns.forEach(function(o){
+        var on=(o===b)&&willOpen;
+        o.setAttribute("aria-expanded",String(on));
+        document.getElementById(o.getAttribute("data-pick")).classList.toggle("open",on);
+      });
+    });
+  });
+})();
+</script>
+<script type="module" src="app.js?v=20261014g"
   onerror="document.getElementById('boot').hidden=true;document.getElementById('bootError').hidden=false"></script>
 </body>
 </html>
