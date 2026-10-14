@@ -143,16 +143,11 @@ function setMemberView(on) {
   document.body.classList.toggle("isMember", on);
   document.querySelectorAll(".sec").forEach(sec => {
     const t = sec.querySelector(".secTitle");
-    if (on) { t.setAttribute("role", "button"); t.tabIndex = 0; }
-    else { t.removeAttribute("role"); t.removeAttribute("tabindex"); t.removeAttribute("aria-expanded"); sec.classList.remove("open"); }
-    if (on && wasMember !== true) {                // first time in member view: Meal open, others closed
-      const open = false;
-      sec.classList.toggle("open", open); t.setAttribute("aria-expanded", open);
-    }
+    t.setAttribute("role", "button"); t.tabIndex = 0;
+    if (wasMember !== on) { sec.classList.remove("open"); t.setAttribute("aria-expanded", "false"); }   // all closed when the view changes
   });
   wasMember = on;
 }
-
 // Several Google Sheets are connected (each has its own Apps Script web app + Members tab).
 const isUrl = u => /^https?:\/\//.test(u || "") && !String(u).includes("PASTE_");
 const books = (Array.isArray(CFG.BOOKS) && CFG.BOOKS.length ? CFG.BOOKS : [{ id: "main", label: "খাদ্য তথ্য", url: CFG.SCRIPT_URL }]).filter(b => isUrl(b.url));
@@ -1146,19 +1141,15 @@ function renderAlerts() {
 }
 // ---------- Toggle slide boxes + pixel printer icons ----------
 document.querySelectorAll("[data-slide]").forEach(btn => btn.onclick = () => {
-  btn.setAttribute("aria-expanded", String($(btn.dataset.slide).classList.toggle("open")));
+  const open = $(btn.dataset.slide).classList.toggle("open");
+  btn.setAttribute("aria-expanded", String(open));
+  if (open && btn.classList.contains("slideToggle")) {
+    document.querySelectorAll(".slideToggle[data-slide]").forEach(o => {
+      if (o === btn) return;
+      $(o.dataset.slide).classList.remove("open");
+      o.setAttribute("aria-expanded", "false");
+    });
+  }
 });
-const PRINTER = ["..####..", "..#..#..", "########", "#......#", "########", ".#....#.", ".######."];
-document.querySelectorAll(".printMini button").forEach(b => {
-  const ns = "http://www.w3.org/2000/svg", s = document.createElementNS(ns, "svg");
-  s.setAttribute("viewBox", "0 0 8 7"); s.setAttribute("class", "pxi"); s.setAttribute("shape-rendering", "crispEdges"); s.setAttribute("aria-hidden", "true");
-  PRINTER.forEach((row, y) => [...row].forEach((c, x) => {
-    if (c !== "#") return;
-    const r = document.createElementNS(ns, "rect");
-    r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", 1); r.setAttribute("height", 1); s.appendChild(r);
-  }));
-  b.prepend(s);
-});
-
 // ---------- Service worker: fast start and offline shell ----------
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => { /* ignore */ });
