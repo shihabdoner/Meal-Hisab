@@ -559,3 +559,70 @@ body:not(.isAdmin) .imgBanner,#bookBar[hidden]+.imgBanner{display:none}
   main{display:none!important}
   #report{display:block!important}
 }
+
+/* =====================================================================
+   14  BOX IDENTITY: each big box gets its own hue, quiet left stripe and
+       header style. Works in both themes (tokens only).
+       Profile = role accent · Dashboard = lavender · Meal/Grocery/Fund = orange
+       Sheet view = mint · Member permissions = yellow
+   ===================================================================== */
+:root{--sun-ink:#7A5200}
+:root[data-theme="dark"]{--sun-ink:#F0CE72}
+
+#boxDash{--bx:var(--lav);--bx-soft:var(--lav-soft);--bx-ink:var(--lav-ink)}
+#boxSections{--bx:var(--orange);--bx-soft:var(--orange-soft);--bx-ink:var(--orange-ink)}
+#boxSheet{--bx:var(--mint);--bx-soft:var(--mint-soft);--bx-ink:var(--mint-ink)}
+#boxAdmin{--bx:var(--sun);--bx-soft:var(--sun-soft);--bx-ink:var(--sun-ink)}
+
+/* profile bar: tinted surface, solid stripe in the role colour, name in display type */
+.topbar{position:relative;overflow:hidden;background:var(--accent-soft);padding:var(--s-3) var(--s-4) var(--s-3) calc(var(--s-4) + 10px)}
+.topbar::before{content:"";position:absolute;inset:0 auto 0 0;width:10px;background:var(--accent)}
+.topIdentity{display:grid;gap:2px}
+#me{font-family:var(--font-display);font-weight:400;font-synthesis:none;font-size:var(--fs-lg);line-height:1.2;color:var(--ink)}
+
+/* big box headers: tinted bar, coloured stripe, round chevron; fills with the box colour when open */
+.slideBox .slideToggle{position:relative;overflow:hidden;padding:var(--s-3) var(--s-3) var(--s-3) calc(var(--s-4) + 10px);
+  font-size:var(--fs-lg);--btn-fg:var(--bx-ink)}
+.slideBox .slideToggle::before{content:"";position:absolute;inset:0 auto 0 0;width:10px;background:var(--bx)}
+#boxDash .slideToggle,#boxSections>.slideToggle,#boxSheet>.slideToggle,#boxAdmin>.slideToggle{--btn-bg:var(--bx-soft);--btn-bg-h:var(--bx-soft)}
+#boxDash .slideToggle[aria-expanded="true"],#boxSections>.slideToggle[aria-expanded="true"],#boxSheet>.slideToggle[aria-expanded="true"],#boxAdmin>.slideToggle[aria-expanded="true"]{
+  --btn-bg:var(--bx);--btn-bg-h:var(--bx);--btn-fg:var(--ink)}
+.slideBox .slideToggle .chev{display:grid;place-items:center;flex:none;width:30px;height:30px;font-size:.9rem;line-height:1;color:var(--ink);
+  background:var(--bx);border:var(--bw-thin) solid var(--line);border-radius:50%}
+.slideBox .slideToggle[aria-expanded="true"] .chev{background:var(--white)}
+
+/* opened content hangs off a thin rail in the box colour */
+.slideBox>.histBody>.histInner>.slidePad{margin-left:8px;padding-left:10px;border-left:var(--bw) solid var(--bx)}
+
+/* dashboard: two small labelled groups (CSS only, no markup) */
+#dashBody .grid::before{grid-column:1/-1;padding-bottom:var(--s-1);font-family:var(--font-display);font-size:var(--fs-md);letter-spacing:.02em;color:var(--bx-ink);border-bottom:var(--bw-thin) dashed var(--bx)}
+#dashBody .mine::before{content:"My account"}
+#dashBody .grid:not(.mine)::before{content:"Group fund"}
+
+/* Grocery / Meal / Fund headers: no filled block, just a coloured rule and tinted text */
+.secGrocery{--ac-ink:var(--orange-ink)}
+.secMeal{--ac-ink:var(--lav-ink)}
+.secFund{--ac-ink:var(--mint-ink)}
+.secTitle{padding:var(--s-1) 0 var(--s-2);color:var(--ac-ink);background:transparent;border:0;border-bottom:var(--bw) solid var(--ac);border-radius:0;box-shadow:none}
+body.isMember .secTitle{padding:var(--s-3);background:var(--paper-2);border:var(--bw-thin) solid var(--line);border-left:8px solid var(--ac);border-radius:var(--r-md)}
+.sec .card{border-left:6px solid var(--ac)}
+
+/* inner card headers (summaries) take the colour of the box / section they sit in */
+.slideBox summary{--hdr:var(--bx-ink)}
+.sec summary{--hdr:var(--ac-ink)}
+summary{color:var(--hdr,var(--ink))}
+summary::marker{color:var(--hdr,var(--ink))}
+details.card[open]>summary{padding-bottom:var(--s-2);border-bottom:var(--bw-thin) dashed var(--hdr,var(--line))}
+.sheet{border-left:8px solid var(--bx)}
+
+/* member permissions: dot-marked small headers */
+.permissionBox h3,.permGroup>b{display:flex;align-items:center;gap:var(--s-2);color:var(--bx-ink)}
+.permissionBox h3{font-size:var(--fs-lg)}
+.permGroup>b{font-size:var(--fs-md)}
+.permissionBox h3::before,.permGroup>b::before{content:"";flex:none;width:12px;height:12px;background:var(--bx);border:var(--bw-thin) solid var(--line);border-radius:50%}
+.permGroup,.mrow{border-left:6px solid var(--bx)}
+
+@media(max-width:440px){
+  .slideBox>.histBody>.histInner>.slidePad{margin-left:4px;padding-left:8px}
+  .slideBox .slideToggle{font-size:var(--fs-md)}
+}
