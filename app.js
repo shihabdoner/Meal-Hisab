@@ -146,7 +146,7 @@ function setMemberView(on) {
     if (on) { t.setAttribute("role", "button"); t.tabIndex = 0; }
     else { t.removeAttribute("role"); t.removeAttribute("tabindex"); t.removeAttribute("aria-expanded"); sec.classList.remove("open"); }
     if (on && wasMember !== true) {                // first time in member view: Meal open, others closed
-      const open = sec.classList.contains("secMeal");
+      const open = false;
       sec.classList.toggle("open", open); t.setAttribute("aria-expanded", open);
     }
   });
@@ -310,7 +310,6 @@ function showShell() {
   }
   $("boot").hidden = true; $("app").hidden = false;
   document.body.classList.toggle("isMember", hint === "member");
-  if (hint === "member") document.querySelector(".secMeal").classList.add("open");   // same as the real first view
   $("app").classList.add("loading"); $("app").setAttribute("aria-busy", "true");
 }
 function setLive(on) { const l = $("live"); l.textContent = on ? "● live" : "● offline"; l.className = "live " + (on ? "on" : "off"); }
@@ -491,7 +490,7 @@ function applyViews() {
     });
     if (pending) pending.classList.add("fill");      // a lone card fills the row
   });
-  $("sheetHead").hidden = !["sheetMeals", "sheetSpending", "sheetDeposits"].some(canSee);
+  $("boxSheet").hidden = !["sheetMeals", "sheetSpending", "sheetDeposits"].some(canSee);
   const pa = { my: ["myDep", "resid", "due"].some(canSee), fund: ["totalFund", "totalSpent", "left"].every(canSee), bazar: canSee("sheetSpending") };
   document.querySelectorAll("[data-p]").forEach(b => { b.hidden = b.dataset.p === "all" ? !(pa.my && pa.fund && pa.bazar) : !pa[b.dataset.p]; });
   document.querySelector(".printMini").hidden = ![...document.querySelectorAll("[data-p]")].some(b => !b.hidden);
