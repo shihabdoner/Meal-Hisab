@@ -124,7 +124,7 @@ function fillNameSelect(id, blankLabel, exclude) {
 fillNameSelect("fundWho", "— নাম নির্বাচন করুন —");
 fillNameSelect("mealWho", "— নাম নির্বাচন করুন —");
 
-// ---------- Members: slide-open sections ----------
+// ---------- Spending / Meal / Fund: slide-open sections (members AND admin) ----------
 document.querySelectorAll(".sec").forEach(sec => {
   const title = sec.querySelector(".secTitle");
   const body = document.createElement("div"); body.className = "secBody";
@@ -132,7 +132,6 @@ document.querySelectorAll(".sec").forEach(sec => {
   [...sec.children].filter(c => c !== title).forEach(c => inner.appendChild(c));
   body.appendChild(inner); sec.appendChild(body);
   const toggle = () => {
-    if (!document.body.classList.contains("isMember")) return;   // admin: nothing happens
     title.setAttribute("aria-expanded", sec.classList.toggle("open"));
   };
   title.addEventListener("click", toggle);
@@ -148,6 +147,7 @@ function setMemberView(on) {
   });
   wasMember = on;
 }
+
 // Several Google Sheets are connected (each has its own Apps Script web app + Members tab).
 const isUrl = u => /^https?:\/\//.test(u || "") && !String(u).includes("PASTE_");
 const books = (Array.isArray(CFG.BOOKS) && CFG.BOOKS.length ? CFG.BOOKS : [{ id: "main", label: "খাদ্য তথ্য", url: CFG.SCRIPT_URL }]).filter(b => isUrl(b.url));
@@ -1139,7 +1139,8 @@ function renderAlerts() {
     });
   });
 }
-// ---------- Toggle slide boxes + pixel printer icons ----------
+
+// ---------- Toggle slide boxes (the four big headers are mutually exclusive) + pixel printer icons ----------
 document.querySelectorAll("[data-slide]").forEach(btn => btn.onclick = () => {
   const open = $(btn.dataset.slide).classList.toggle("open");
   btn.setAttribute("aria-expanded", String(open));
@@ -1151,5 +1152,17 @@ document.querySelectorAll("[data-slide]").forEach(btn => btn.onclick = () => {
     });
   }
 });
+const PRINTER = ["..####..", "..#..#..", "########", "#......#", "########", ".#....#.", ".######."];
+document.querySelectorAll(".printMini button").forEach(b => {
+  const ns = "http://www.w3.org/2000/svg", s = document.createElementNS(ns, "svg");
+  s.setAttribute("viewBox", "0 0 8 7"); s.setAttribute("class", "pxi"); s.setAttribute("shape-rendering", "crispEdges"); s.setAttribute("aria-hidden", "true");
+  PRINTER.forEach((row, y) => [...row].forEach((c, x) => {
+    if (c !== "#") return;
+    const r = document.createElementNS(ns, "rect");
+    r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", 1); r.setAttribute("height", 1); s.appendChild(r);
+  }));
+  b.prepend(s);
+});
+
 // ---------- Service worker: fast start and offline shell ----------
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => { /* ignore */ });
