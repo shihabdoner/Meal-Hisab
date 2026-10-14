@@ -1,23 +1,40 @@
-# খাদ্য তথ্য v3 — Google Sheet is the database
+# খাদ্য তথ্য — v2 edition
 
-Website (GitHub Pages) <-> Google Apps Script (bound to your sheet) <-> your Google Sheet.
-Firebase is used only for Google sign-in. Members/admin live in the sheet's "Members" tab.
+```
+app_v2/
+  frontend/    index.html  app.js  sw.js        ← replace these three files
+  apps_script/ khaddo_tottho.gs  bazar_hisab.gs ← replace the code in each Apps Script project
+```
+Not changed, keep yours: `style.css`, `manifest.json`, `firebase-config.js`, `img/`, icons.
 
-## Setup
-1. Upload your original Excel file (or the CSV) to Google Drive, open it with Google Sheets
-   (CSV has no colours/merged cells and lost the Bengali letters (they show as ????) - re-type them in the sheet or upload the .xlsx).
-2. In the sheet: Extensions -> Apps Script. Delete the sample code, paste `apps-script-code.txt`, Save.
-3. Choose the function `setup` in the toolbar -> Run. Approve the permissions
-   (Advanced -> "Go to ... (unsafe)" -> Allow). This adds Members + MealDetails tabs and SUM formulas to the total rows.
-4. Open the new **Members** tab. In row 2 type: Shihab's Gmail (lowercase) | Shihab | TRUE
-5. Deploy -> New deployment -> type: Web app -> Execute as: **Me** -> Who has access: **Anyone** -> Deploy. Copy the URL (ends with /exec).
-6. Put the URL in `firebase-config.js` (SCRIPT_URL). Upload `index.html`, `app.js`, `style.css`, `firebase-config.js` to GitHub.
-7. Open the site, sign in as Shihab, use **Group admin** to add everyone's Gmail.
+The two scripts are generated from one source and differ in exactly three places: the header line, `SOURCE_URL`, and the `doGet` text.
+`bazar_hisab.gs` already contains your খাদ্য তথ্য web-app URL as `SOURCE_URL`.
 
-If you change the script later: Deploy -> Manage deployments -> edit -> New version.
+## What is new
 
-## Notes
-- Each person's meal cell = lunch + dinner count (a filled box counts 1, or the number typed). Text is kept in the MealDetails tab.
-- Deposit/spending cells hold one amount per date; adding on the same date adds to the cell.
-- The sheet covers the dates in column F (Oct 1-30). For a new month, copy the tab with new dates.
-- Firestore is no longer used: set its rules to deny all (`allow read, write: if false;`).
+| Area | Change |
+|---|---|
+| Duplicates | Every write carries a request id. Pressing Add twice, a timeout, or a busy script can no longer add a grocery entry or deposit twice. The app retries automatically (up to 3 tries). |
+| Secret | `SYNC_SECRET` is no longer in the code. It lives in Script Properties and the sync path is off until you set it (24+ characters). |
+| Safe saves | Logs are written new-first, old-tail-last. A failed write keeps the old rows. |
+| Text safety | Details, notes and name columns are stored as plain text (`=1+1`, `5/10` stay text). |
+| Room to grow | `Activity` and `MealDetails` no longer stop at 1000 rows; a failing alert write cannot make a successful save look like an error. |
+| Amounts | One amount rule everywhere: above 0 (0 only for admin removal), at most 2 decimals, at most 10,000,000. |
+| Health report | Admin-only, read-only. Run `reconcileReport()` in the editor (output in Executions → Logs). Also shows both timezones. |
+| App | No popup when a background refresh fails; a page left open overnight rolls to the new day; service worker `khaddo-v6`. |
+| Drift | Both scripts now share the empty-source guard (previously only in বেলা হিসাব). |
+
+## Deploy (do on COPIES first; see batch1/PATCH_NOTES.md Part 3 for the full checklist)
+1. Copy both spreadsheets. Copy both script projects.
+2. In **both** projects: Project Settings → Script properties → add `SYNC_SECRET` = the same new random value (24+ characters). Run `checkSecretConfigured()` — it should log `true`.
+3. Paste `khaddo_tottho.gs` into the খাদ্য তথ্য project and `bazar_hisab.gs` into the বেলা হিসাব project (replace everything). Authorize if asked.
+4. Deploy a new version of **খাদ্য তথ্য, then বেলা হিসাব, back to back** (Deploy → Manage deployments → edit → New version). Between the two, the mirror sync reports "Bad sync secret" — safe, nothing is written.
+5. Upload the three frontend files. Reload twice (the service worker updates on the second load).
+6. As admin: press ⟳, check the "● live" label, add a test grocery entry, press Add twice, confirm one row. Then run `reconcileReport()`.
+
+Rollback: Deploy → Manage deployments → pick the previous version; restore the old frontend files; the old code still has its old `SYNC_SECRET` constant, so keep your old file.
+
+## Tests (all simulated in Node with mocked Apps Script services; nothing touched a real spreadsheet)
+- `batch1/test_server_patch.js` — 21 tests (run against the patch, and again against each full script)
+- `batch1/test_handle.js` — 12 tests of the request router on each full script
+- Frontend: syntax check passes and every element id used by `app.js` exists in `index.html`. Browser behaviour is NOT tested.
