@@ -8,7 +8,7 @@
      3  Cards + dashboard colours
      4  Controls (inputs, buttons, focus, validation)
      5  Chips, rows, date toggles, inline editors
-     6  Slide boxes + sections (Grocery / Meal / Fund, member accordion)
+     6  Slide boxes + sections (Spending / Meal / Fund accordion)
      7  Sheet view (Excel look)
      8  Admin: alerts, members, permissions
      9  Loading: skeleton, splash, veil, toast, reload button
@@ -328,20 +328,22 @@ button.plusBtn{--btn-bg:var(--paper-2);--btn-fg:var(--ink);border-style:dashed}
 .mealEditor textarea:focus-visible{outline:3px solid var(--lav-ink);outline-offset:0;border-radius:var(--r-sm)}
 .mealEditor textarea[readonly]{opacity:.8;cursor:not-allowed;background:var(--paper-2)}
 
-/* MEMBER: Meal first, slide-open accordion (all closed to start) */
+/* Spending / Meal / Fund: slide-open accordion for admin AND members (all closed to start) */
+.secTitle{justify-content:space-between;margin:0;cursor:pointer;user-select:none}
+.secTitle::after{content:"▾";margin-left:auto;padding-left:var(--s-3);transition:transform var(--t-med) ease}
+.sec:not(.open) .secTitle::after{transform:rotate(-90deg)}
+.secBody{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s ease}
+.sec.open .secBody{grid-template-rows:1fr}
+.secInner{min-height:0;overflow:hidden;padding:0 var(--s-1);visibility:hidden;transition:padding .35s ease,visibility 0s .35s}
+.sec.open .secInner{padding:var(--s-3) var(--s-1) var(--s-1);visibility:visible;transition:padding .35s ease,visibility 0s}
+
+/* MEMBER: Meal first */
 body.isMember #app{display:flex;flex-direction:column}
 body.isMember #app>*{order:2}
 body.isMember #app>.topbar,body.isMember #app>#previewNotice,body.isMember #app>#alertBar{order:0}
 body.isMember #app>#boxSections{order:1}
 body.isMember .sections{gap:var(--s-3);margin-top:var(--s-2);margin-bottom:var(--s-4)}
 body.isMember .secMeal{order:-1}
-body.isMember .secTitle{justify-content:space-between;margin:0;cursor:pointer;user-select:none}
-body.isMember .secTitle::after{content:"▾";margin-left:auto;padding-left:var(--s-3);transition:transform var(--t-med) ease}
-body.isMember .sec:not(.open) .secTitle::after{transform:rotate(-90deg)}
-body.isMember .secBody{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s ease}
-body.isMember .sec.open .secBody{grid-template-rows:1fr}
-body.isMember .secInner{min-height:0;overflow:hidden;padding:0 var(--s-1);visibility:hidden;transition:padding .35s ease,visibility 0s .35s}
-body.isMember .sec.open .secInner{padding:var(--s-3) var(--s-1) var(--s-1);visibility:visible;transition:padding .35s ease,visibility 0s}
 
 /* ---------- 7. SHEET VIEW (Excel look, framed) ---------- */
 :root{--sheet-cell:#fff;--sheet-grid:#cfc8dc;--sheet-head:#E7DEFA;--sheet-letters:#F5F0FF;--sheet-letter-ink:#4a4256;--sheet-ink:#080808;
@@ -599,12 +601,11 @@ body:not(.isAdmin) .imgBanner,#bookBar[hidden]+.imgBanner{display:none}
 #dashBody .mine::before{content:"My account"}
 #dashBody .grid:not(.mine)::before{content:"Group fund"}
 
-/* Grocery / Meal / Fund headers: no filled block, just a coloured rule and tinted text */
+/* Spending / Meal / Fund headers: tinted bar with a coloured left stripe (same look for admin and members) */
 .secGrocery{--ac-ink:var(--orange-ink)}
 .secMeal{--ac-ink:var(--lav-ink)}
 .secFund{--ac-ink:var(--mint-ink)}
-.secTitle{padding:var(--s-1) 0 var(--s-2);color:var(--ac-ink);background:transparent;border:0;border-bottom:var(--bw) solid var(--ac);border-radius:0;box-shadow:none}
-body.isMember .secTitle{padding:var(--s-3);background:var(--paper-2);border:var(--bw-thin) solid var(--line);border-left:8px solid var(--ac);border-radius:var(--r-md)}
+.secTitle{padding:var(--s-3);color:var(--ac-ink);background:var(--paper-2);border:var(--bw-thin) solid var(--line);border-left:8px solid var(--ac);border-radius:var(--r-md);box-shadow:none}
 .sec .card{border-left:6px solid var(--ac)}
 
 /* inner card headers (summaries) take the colour of the box / section they sit in */
@@ -641,3 +642,18 @@ details.card[open]>summary{padding-bottom:var(--s-2);border-bottom:var(--bw-thin
 .utilToggle[aria-expanded="true"]{--btn-bg:var(--ac);--btn-fg:var(--ink)}
 .utilPad{padding:var(--s-3);margin-bottom:var(--s-2);background:var(--white);border:var(--bw-thin) dashed var(--line);border-radius:var(--r-md);font-weight:700}
 @media(max-width:440px){.pickBtn{font-size:var(--fs-sm);padding:var(--s-2)}}
+
+/* =====================================================================
+   16  LATEST CHANGES
+   ===================================================================== */
+/* dashboard: important numbers in green */
+#dashBody .card .v{color:#00ff00}
+
+/* Fund: "জমাদানের তথ্য" toggle (last item in the Fund box) */
+.depsToggle{--btn-bg:var(--mint-soft);--btn-bg-h:var(--mint)}
+.depsToggle[aria-expanded="true"]{--btn-bg:var(--mint)}
+
+/* Member permissions: "Add/Edit member" toggle */
+.memberToggle{--btn-bg:var(--bx-soft);--btn-bg-h:var(--bx);margin-top:0;margin-bottom:var(--s-2)}
+.memberToggle[aria-expanded="true"]{--btn-bg:var(--bx)}
+.memberPad{padding-top:var(--s-2)}
