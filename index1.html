@@ -19,7 +19,7 @@
 })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#B49AE8">
 <title>খাদ্য তথ্য</title>
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -32,23 +32,21 @@
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<!-- Title font: loaded normally so the pixel title never flashes in a fallback face -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
-<!-- Interface fonts: non-blocking (print-media trick); Press Start 2P is already loaded above -->
+<!-- Fonts: Lilita One (display) + Nunito (interface). Non-blocking (print-media trick); every stack has system fallbacks, so nothing waits on the download -->
 <link
   rel="stylesheet"
   media="print"
   onload="this.media='all'"
-  href="https://fonts.googleapis.com/css2?family=Cascadia+Code:wght@400;700&family=Exo+2:wght@400;600;700&family=Merienda:wght@400;700&display=swap"
+  href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&display=swap"
 >
 <noscript>
   <link
     rel="stylesheet"
-    href="https://fonts.googleapis.com/css2?family=Cascadia+Code:wght@400;700&family=Exo+2:wght@400;600;700&family=Merienda:wght@400;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&display=swap"
   >
 </noscript>
-<link rel="stylesheet" href="style.css?v=20261013a">
-<link rel="modulepreload" href="app.js?v=20261013a">
+<link rel="stylesheet" href="style.css?v=20261014d">
+<link rel="modulepreload" href="app.js?v=20261014d">
 <link rel="modulepreload" href="firebase-config.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
@@ -105,12 +103,16 @@ function word(w,fill,shade,t0){
   });
   return out;
 }
-document.getElementById("spMeal").innerHTML=word("MEAL","#5fd35f","#17401a",0);
-document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",450);
+document.getElementById("spMeal").innerHTML=word("MEAL","#B49AE8","#080808",0);
+document.getElementById("spSheets").innerHTML=word("Sheets","#FF7417","#080808",450);
 })();
 </script>
 <main>
-  <h1 class="Fronttext" id="bookTitle">খাদ্য তথ্য</h1>
+  <header class="brand">
+    <svg class="decor" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path d="M20 3 25 15 37 20 25 25 20 37 15 25 3 20 15 15Z" fill="#FFD166" stroke="#080808" stroke-width="2.5" stroke-linejoin="round"/></svg>
+    <h1 class="Fronttext" id="bookTitle">খাদ্য তথ্য</h1>
+    <svg class="decor" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><circle cx="20" cy="20" r="16" fill="#85D6B7" stroke="#080808" stroke-width="3"/><circle cx="14" cy="17" r="2.5" fill="#080808"/><circle cx="26" cy="17" r="2.5" fill="#080808"/><path d="M12 24Q20 33 28 24" fill="none" stroke="#080808" stroke-width="3" stroke-linecap="round"/></svg>
+  </header>
   <div class="date">Date: <b id="today"></b> <span id="live" class="live off">● offline</span></div>
 
   <div id="setup" class="notice" hidden>No sheet is connected yet. Open <code>firebase-config.js</code> and paste the Apps Script web app URL(s).</div>
@@ -125,7 +127,7 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",
     <button id="retryBtn" hidden>Retry</button>
   </section>
 
-  <!-- First-visit skeleton (now inside <main>, so it shares the page's width and padding) -->
+  <!-- First-visit skeleton (inside <main>, so it shares the page's width and padding) -->
   <div id="boot" class="boot" aria-hidden="true">
     <div class="skel skel-bar"></div>
     <div class="grid">
@@ -149,7 +151,7 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",
 
     <div class="slideBox" id="boxDash">
       <div class="slideHead">
-        <button type="button" class="histToggle slideToggle" data-slide="dashBody" aria-expanded="true" aria-controls="dashBody"><span>Dashboard</span><span class="chev">▾</span></button>
+        <button type="button" class="histToggle slideToggle" data-slide="dashBody" aria-expanded="false" aria-controls="dashBody"><span>Dashboard</span><span class="chev">▾</span></button>
         <div class="printMini" role="group" aria-label="Print / Save as PDF">
           <button type="button" data-p="my" title="Print my data">MY</button>
           <button type="button" data-p="fund" title="Print fund data">FUND</button>
@@ -157,7 +159,7 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",
           <button type="button" data-p="all" title="Print everything">ALL</button>
         </div>
       </div>
-      <div class="histBody open" id="dashBody"><div class="histInner"><div class="slidePad">
+      <div class="histBody" id="dashBody"><div class="histInner"><div class="slidePad">
 
         <div class="grid mine">
           <div class="card wide" id="myDepCard"><div class="k">My deposit to fund</div><div class="v" id="myDep">৳0</div></div>
@@ -181,8 +183,8 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",
     </div>
 
     <div class="slideBox" id="boxSections">
-      <button type="button" class="histToggle slideToggle" data-slide="secBody" aria-expanded="true" aria-controls="secBody"><span>Meal, Grocery, Fund</span><span class="chev">▾</span></button>
-      <div class="histBody open" id="secBody"><div class="histInner"><div class="slidePad">
+      <button type="button" class="histToggle slideToggle" data-slide="secBody" aria-expanded="false" aria-controls="secBody"><span>Meal, Grocery, Fund</span><span class="chev">▾</span></button>
+      <div class="histBody" id="secBody"><div class="histInner"><div class="slidePad">
 
         <div class="sections">
           <!-- ===== GROCERY ===== -->
@@ -263,13 +265,19 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",
       </div></div></div>
     </div>
 
-    <h2 class="flick" id="sheetHead">Sheet view</h2>
-    <div id="bookBar" class="bookBar" hidden><label for="bookSel">Sheet</label><select id="bookSel" aria-label="Choose the spreadsheet"></select></div>
-    <div id="sheetBanner" class="imgBanner" aria-hidden="true"></div>
+    <div class="slideBox" id="boxSheet">
+      <button type="button" class="histToggle slideToggle" data-slide="sheetBody" aria-expanded="false" aria-controls="sheetBody"><span>Sheet view</span><span class="chev">▾</span></button>
+      <div class="histBody" id="sheetBody"><div class="histInner"><div class="slidePad">
 
-    <details class="card sheet" id="sheetMeals"><summary>Meals (per day) <span class="alertDot" data-alert="meal" hidden></span></summary><div class="secAlert" data-alert="meal" hidden></div><div id="tblMeals" class="tablewrap"></div></details>
-    <details class="card sheet" id="sheetSpending"><summary>Grocery spending <span class="alertDot" data-alert="spending" hidden></span></summary><div class="secAlert" data-alert="spending" hidden></div><div id="tblSpending" class="tablewrap"></div></details>
-    <details class="card sheet" id="sheetDeposits"><summary>Deposits <span class="alertDot" data-alert="deposit" hidden></span></summary><div class="secAlert" data-alert="deposit" hidden></div><div id="tblDeposits" class="tablewrap"></div></details>
+        <div id="bookBar" class="bookBar" hidden><label for="bookSel">Sheet</label><select id="bookSel" aria-label="Choose the spreadsheet"></select></div>
+        <div id="sheetBanner" class="imgBanner" aria-hidden="true"></div>
+
+        <details class="card sheet" id="sheetMeals"><summary>Meals (per day) <span class="alertDot" data-alert="meal" hidden></span></summary><div class="secAlert" data-alert="meal" hidden></div><div id="tblMeals" class="tablewrap"></div></details>
+        <details class="card sheet" id="sheetSpending"><summary>Grocery spending <span class="alertDot" data-alert="spending" hidden></span></summary><div class="secAlert" data-alert="spending" hidden></div><div id="tblSpending" class="tablewrap"></div></details>
+        <details class="card sheet" id="sheetDeposits"><summary>Deposits <span class="alertDot" data-alert="deposit" hidden></span></summary><div class="secAlert" data-alert="deposit" hidden></div><div id="tblDeposits" class="tablewrap"></div></details>
+
+      </div></div></div>
+    </div>
 
     <div class="slideBox adminOnly" id="boxAdmin" hidden>
       <button type="button" class="histToggle slideToggle" data-slide="adminBody" aria-expanded="false" aria-controls="adminBody"><span>Member permissions</span><span class="chev">▾</span></button>
@@ -310,6 +318,7 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",
       </div></div></div>
     </div>
 
+  </div>
 </main>
 <div id="loadStatus" class="srOnly" role="status" aria-live="polite"></div>
 <button id="fab" type="button" aria-label="Reload" title="Reload">⟳</button>
@@ -319,7 +328,7 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#cfcfcf","#3b3b3b",
   <span id="toastTxt">Loading…</span>
 </div>
 <div id="report"></div>
-<script type="module" src="app.js?v=20261013a"
+<script type="module" src="app.js?v=20261014d"
   onerror="document.getElementById('boot').hidden=true;document.getElementById('bootError').hidden=false"></script>
 </body>
 </html>
