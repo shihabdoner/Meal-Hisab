@@ -1,16 +1,14 @@
-//khaddo tottho appscript (খাদ্য তথ্য)  — v2 (Batch 1 applied)
+//Original
+//khaddo tottho appscript (খাদ্য তথ্য)
 /** Meal-fund API. Google Sheets stays the source of truth.
- *  Same code in BOTH scripts (খাদ্য তথ্য and বেলা হিসাব). Only SOURCE_URL (and the doGet text) differ.
+ *  Same code in BOTH scripts (খাদ্য তথ্য and বেলা হিসাব). Only SOURCE_URL differs.
  *
  *  Grocery entries live in the "GroceryLog" tab (one row per purchase: date, time, বাজারকর্তা, amount, details).
  *  Deposits live in the "DepositLog" tab (one row per deposit). The date tables in the sheet are drawn from these logs:
  *  a date with 3 purchases gets 3 rows (extra rows are inserted under the date, time in the column next to the date).
  *  Edits typed directly into the বেলা হিসাব bazar block are pushed back to খাদ্য তথ্য (see onBazarEdit / bazarSweep).
- *  Entries that have no বাজারকর্তা stay in খাদ্য তথ্য / the app and are never touched by the বেলা হিসাব sync.
- *
- *  v2: the sync secret is NOT in this file any more. Set it by hand in Project Settings → Script properties
- *  as SYNC_SECRET (identical value, at least 24 characters, in BOTH projects). */
-const FIREBASE_API_KEY = 'AIzaSyAfp6ACmE3d-9iAieAp1knA40qKEbdcx7Y'; // same key as firebase-config.js (a public web key)
+ *  Entries that have no বাজারকর্তা stay in খাদ্য তথ্য / the app and are never touched by the বেলা হিসাব sync. */
+const FIREBASE_API_KEY = 'AIzaSyAfp6ACmE3d-9iAieAp1knA40qKEbdcx7Y'; // same key as firebase-config.js
 const NAMES = ['Shohan', 'Naved', 'Salman', 'Rifat', 'Shihab', 'Ashmit'];
 const MONTHS = {january:0,february:1,march:2,april:3,may:4,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -18,6 +16,8 @@ const MEMBER_HEADERS = ['Email', 'Name', 'Admin', 'AddFor', 'AddSpending', 'CanG
 const VIEW_KEYS = ['sheetMeals','sheetSpending','sheetDeposits','myDep','resid','due','lastFund','lastDate','lastGrocery','totalFund','totalSpent','left'];
 // In the "বেলা হিসাব" (Bazar hisab) script this is the খাদ্য তথ্য web app URL. In the খাদ্য তথ্য script it stays ''.
 const SOURCE_URL = '';
+// Password the two scripts use to talk to each other without a signed-in user (must be IDENTICAL in both scripts).
+const SYNC_SECRET = '2aV67b4c02f40b45762adb946a9a0235e308b11fc48f1492';
 
 // TEMPORARY RULE (Bazar hisab only, October 2026): when copying from khaddo, show 'N/A' as BLANK for these dates.
 const BLANK_NA_FROM = '2026-10-01';
@@ -363,7 +363,15 @@ function sameRows_(s, last, width, rows) {
   }
   return true;
 }
-// (v2: writeLog_ moved to the "v2 additions" section at the end of this file)
+function writeLog_(entries) {
+  const s = glTab_(), last = s.getLastRow();
+  const rows = entries.map(function (e) {
+    return [e.id, e.date, e.time || '', e.person, e.amount, e.details || '', e.email || '', e.name || ''];
+  });
+  if (sameRows_(s, last, GL_HEAD.length, rows)) return;
+  if (last > 1) s.getRange(2, 1, last - 1, GL_HEAD.length).clearContent();
+  if (rows.length) s.getRange(2, 1, rows.length, GL_HEAD.length).setValues(rows);
+}
 function sortEntries_(list) {
   return list.map(function (e, i) { return { e: e, i: i }; }).sort(function (a, b) {
     return a.e.date.localeCompare(b.e.date) || (a.e.time || '').localeCompare(b.e.time || '') || (a.i - b.i);
@@ -382,7 +390,15 @@ function readDepositLog_() {
       email: String(r[5] || ''), name: String(r[6] || '') };
   });
 }
-// (v2: writeDepositLog_ moved to the "v2 additions" section at the end of this file)
+function writeDepositLog_(entries) {
+  const s = dlTab_(), last = s.getLastRow();
+  const rows = entries.map(function (e) {
+    return [e.id, e.date, e.time || '', e.person, e.amount, e.email || '', e.name || ''];
+  });
+  if (sameRows_(s, last, DL_HEAD.length, rows)) return;
+  if (last > 1) s.getRange(2, 1, last - 1, DL_HEAD.length).clearContent();
+  if (rows.length) s.getRange(2, 1, rows.length, DL_HEAD.length).setValues(rows);
+}
 
 // One-time: turn amounts that already sit in the sheet into log rows (so nothing is lost when upgrading).
 function legacyRows_(name) {
@@ -563,7 +579,7 @@ function handle_(req) {
   const t0 = Date.now();
   let me;
   if (req.secret) {
-    if (!secretOk_(req.secret)) throw new Error('Bad sync secret');            // v2: secret comes from Script Properties
+    if (!SYNC_SECRET || req.secret !== SYNC_SECRET) throw new Error('Bad sync secret');
     if (['load', 'importBazar'].indexOf(req.action) < 0) throw new Error('Not allowed');
     me = { email: '', name: SHEET_USER, admin: false, addFor: [], fundsFor: [], mealsFor: [], views: VIEW_KEYS.slice(),
       addSpending: false, canGrocery: false, canFunds: false, canMeals: false };
@@ -581,26 +597,23 @@ function handle_(req) {
     return out;
   }
   if (req.action === 'syncFromSource') return Object.assign({ ok: true }, runSync_(me, req.idToken));   // has its own lock handling
-  if (req.action === 'reconcile') { admin_(me); return auditReport_(); }          // v2: read-only health / reconciliation report
   const lock = getLock_(30000);
   let info = null;
-  const rk = idemId_(req, me);                                                  // v2: a repeated request is answered, not repeated
   try {
-    const seen = idemGet_(rk);
-    if (seen) return Object.assign({ ok: true, duplicate: true }, seen);
     migrateOnce_();
     switch (req.action) {
       case 'setMeal': setMeal_(me, req); break;
       case 'addDeposit':
         if (!(me.admin || me.fundsFor.indexOf(req.person) >= 0))
           throw new Error('You are not allowed to add funds for ' + req.person);
-        if (addDeposit_(me, req) && !me.admin) log_(me, 'deposit', req.person, 'Deposit \u09F3' + Number(req.amount) + ' for ' + req.person + ' (' + req.date + ')');
+        addDeposit_(me, req);
+        if (!me.admin) log_(me, 'deposit', req.person, 'Deposit \u09F3' + Number(req.amount) + ' for ' + req.person + ' (' + req.date + ')');
         break;
       case 'editDeposit': editDeposit_(me, req); break;
       case 'addSpending': {
         if (!(me.admin || me.canGrocery)) throw new Error('You are not allowed to add grocery spending');
         const added = addSpending_(me, req);
-        if (!me.admin && added.length) log_(me, 'spending', '', 'Grocery \u09F3' + added.reduce(function (t, e) { return t + e.amount; }, 0) + ' on ' + req.date +
+        if (!me.admin) log_(me, 'spending', '', 'Grocery \u09F3' + added.reduce(function (t, e) { return t + e.amount; }, 0) + ' on ' + req.date +
           ' (' + added.map(function (e) { return (e.time ? e.time + ' ' : '') + e.person + ' \u09F3' + e.amount; }).join(', ') + ')');
         break;
       }
@@ -614,7 +627,6 @@ function handle_(req) {
       case 'importBazar': info = importBazar_(req); break;
       default: throw new Error('Unknown action');
     }
-    idemPut_(rk, req.action === 'importBazar' ? {} : (info || {}));
   } finally { lock.releaseLock(); }
   return Object.assign({ ok: true }, info || {});
 }
@@ -699,10 +711,7 @@ function setMeal_(me, q) {
   let r = -1;
   for (let i = 1; i < d.length; i++) if ((dateKey_(d[i][0]) || String(d[i][0])) === q.date && d[i][1] === q.person) { r = i + 1; break; }
   if (r < 0) r = s.getLastRow() + 1;
-  ensureRows_(s, r);                                    // v2: the tab can grow past its first 1000 rows
-  const rg = s.getRange(r, 1, 1, 4);
-  rg.setNumberFormat('@');                              // v2: typed text stays text (never a formula, date or number)
-  rg.setValues([[q.date, q.person, lunch, dinner]]);
+  s.getRange(r, 1, 1, 4).setValues([[q.date, q.person, lunch, dinner]]);
   if (mode === 'add') log_(me, 'meal', q.person, 'Meal details for ' + q.person + ' on ' + q.date);
 }
 
@@ -714,7 +723,15 @@ function depCell_(q) {
   return { L: L, range: L.sh.getRange(row.r + 1, L.dep.cols[q.person] + 1) };
 }
 function setDepCell_(c, val) { val = r2_(val); c.range.setValue(val > 0 ? val : ''); }
-// (v2: addDeposit_ moved to the "v2 additions" section at the end of this file)
+function addDeposit_(me, q) {
+  const amt = Number(q.amount); if (!isFinite(amt) || amt <= 0) throw new Error('Enter a valid amount');
+  const c = depCell_(q), np = nowParts_();
+  setDepCell_(c, num_(c.range.getValue()) + amt);
+  const dl = readDepositLog_();
+  dl.push({ id: newId_(), date: q.date, time: np.time, person: q.person, amount: amt, email: me.email, name: me.name });
+  writeDepositLog_(dl);
+  saveDepositMeta_(q.date, q.person, me);
+}
 function latestDepositDate_(L, person) {
   let best = '';
   L.dep.rows.forEach(function (o) { if (num_((L.v[o.r] || [])[L.dep.cols[person]]) > 0 && o.k > best) best = o.k; });
@@ -764,12 +781,37 @@ function clearDeposit_(q) {
 }
 
 // ---------- Grocery actions ----------
-// (v2: cleanItem_ and addSpending_ moved to the "v2 additions" section at the end of this file)
+function cleanItem_(it, date, q) {
+  const person = String(it.bazarKorta || it.person || '').trim();
+  if (NAMES.indexOf(person) < 0) throw new Error('Choose the \u09AC\u09BE\u099C\u09BE\u09B0\u0995\u09B0\u09CD\u09A4\u09BE (who did the bazar) for every purchase');
+  const amount = Number(it.amount); if (!isFinite(amount) || amount <= 0) throw new Error('Enter a valid amount for every purchase');
+  const time = normTime_(it.time);
+  if (!time) throw new Error('Enter the time of every purchase');
+  checkNotFuture_(date, time, q);
+  return { person: person, amount: amount, time: time, details: String(it.details || '').trim().slice(0, 3000) };
+}
+// q.items = [{ bazarKorta, time, amount, details }, ...] all on q.date. Every item becomes its own row under that date in the sheet.
+function addSpending_(me, q) {
+  const date = String(q.date || '');
+  const items = Array.isArray(q.items) && q.items.length ? q.items : [{ bazarKorta: q.bazarKorta, time: q.time || nowParts_().time, amount: q.amount, details: q.details }];
+  const L = layout_();
+  if (!L.spend.rows.some(function (o) { return o.k === date; })) throw new Error('That date is not in the sheet');
+  const fresh = items.map(function (it) { return cleanItem_(it, date, q); });
+  const log = readLog_();
+  if (log.filter(function (e) { return e.date === date; }).length + fresh.length > MAX_PER_DATE) throw new Error('Too many purchases on one date (max ' + MAX_PER_DATE + ')');
+  const added = fresh.map(function (f) {
+    return { id: newId_(), date: date, time: f.time, person: f.person, amount: f.amount, details: f.details, email: me.email, name: me.name };
+  });
+  const all = log.concat(added);
+  writeLog_(all);
+  renderGrocery_(all, [date]);
+  return added;
+}
 // Admin: any entry. A member with the grocery permission: only an entry of the latest date, and only if they added it.
 function editSpending_(me, q) {
   const log = readLog_(), e = log.find(function (x) { return x.id === String(q.id || ''); });
   if (!e) throw new Error('Grocery entry not found');
-  const amt = validAmount_(q.amount, true);             // v2: one amount rule (0 is still allowed = admin removal)
+  const amt = Number(q.amount); if (!isFinite(amt) || amt < 0) throw new Error('Enter a valid amount');
   const person = q.bazarKorta ? String(q.bazarKorta).trim() : e.person;
   if (NAMES.indexOf(person) < 0) throw new Error('Choose the বাজারকর্তা from the listed people');
   const time = q.time !== undefined && q.time !== '' ? normTime_(q.time) : e.time;
@@ -833,7 +875,10 @@ function savePerms_(q) {
 
 // ---------- Activity log + alerts for the admin ----------
 function activity_() { return tab_('Activity', ['Time', 'By', 'Type', 'For', 'Detail', 'Acknowledged'], true); }
-// (v2: log_ moved to the "v2 additions" section at the end of this file)
+function log_(me, type, forName, detail) {
+  const s = activity_(), r = s.getLastRow() + 1;
+  s.getRange(r, 1, 1, 6).setValues([[new Date().toISOString(), me.name, type, forName || '', String(detail).slice(0, 500), false]]);
+}
 function alerts_() {
   const d = activity_().getDataRange().getValues(), out = [];
   for (let i = 1; i < d.length; i++) {
@@ -986,7 +1031,12 @@ function writeCol_(sh, rows, col, valueOf) {
     if (String(vals[i][0]) !== String(v)) sh.getRange(o.r + 1, col + 1).setValue(v);
   });
 }
-// (v2: rewriteTab_ moved to the "v2 additions" section at the end of this file)
+function rewriteTab_(name, headers, rows) {
+  const s = tab_(name, headers, true), last = s.getLastRow();
+  if (sameRows_(s, last, headers.length, rows)) return;
+  if (last > 1) s.getRange(2, 1, last - 1, headers.length).clearContent();
+  if (rows.length) s.getRange(2, 1, rows.length, headers.length).setValues(rows);
+}
 function callSource_(body) {
   const resp = UrlFetchApp.fetch(SOURCE_URL, { method: 'post', contentType: 'text/plain', followRedirects: true, muteHttpExceptions: true, payload: JSON.stringify(body) });
   let j;
@@ -998,16 +1048,7 @@ function syncFromSource_(me, idToken) {
   if (!SOURCE_URL) throw new Error("SOURCE_URL is not set in this sheet's script");
   const first = layout_();
   if (first.kind === 'blocks') pushFromSheet_(first);
-  const sec = syncSecret_();                                                    // v2: from Script Properties
-  const src = callSource_(sec ? { action: 'load', secret: sec } : { action: 'load', idToken: idToken });
-  if (!(src.spending || []).some(function (e) { return num_(e.amount) > 0; })) {
-    const here = layout_();
-    if (here.kind === 'blocks') {
-      const mine = sheetEntries_(here);
-      const n = Object.keys(mine).reduce(function (t, d) { return t + mine[d].length; }, 0);
-      if (n) throw new Error('খাদ্য তথ্য has no grocery entries but this sheet has ' + n + '. Nothing was changed.');
-    }
-  }
+  const src = callSource_(SYNC_SECRET ? { action: 'load', secret: SYNC_SECRET } : { action: 'load', idToken: idToken });
 
   const L = layout_(), sh = L.sh, warn = [];
   const blankNa = function (k, v) {
@@ -1132,7 +1173,7 @@ function pushFromSheet_(L) {
 
   const dates = Object.keys(changes);
   if (dates.length) {
-    const res = callSource_({ action: 'importBazar', secret: syncSecret_(), changes: changes });   // v2: secret from Script Properties
+    const res = callSource_({ action: 'importBazar', secret: SYNC_SECRET, changes: changes });
     const canon = res.entries || {}, next = log.filter(function (e) { return !canon[e.date]; });
     Object.keys(canon).forEach(function (d) { canon[d].forEach(function (e) { next.push(e); }); });
     writeLog_(next);
@@ -1203,7 +1244,6 @@ function importBazar_(q) {
   return { entries: out };
 }
 
-function resetBazarSnapshot() { PropertiesService.getScriptProperties().deleteProperty('SNAP'); }
 
 // Run ONCE in the খাদ্য তথ্য script: rebuilds the grocery log from the amounts, details and বাজারকর্তা still in the sheet cells.
 function restoreGroceryFromSheet() {
@@ -1374,225 +1414,81 @@ function debugLayout() {
     }
   });
 }
+// ---------- Push notifications (Firebase Cloud Messaging) ----------
+const TOKEN_HEAD = ['Email', 'Token', 'Updated'];
+function tokTab_() { return tab_('Tokens', TOKEN_HEAD); }
 
-// =====================================================================
-//  v2 additions (Batch 1) — security, retry safety, safe writes, reconcile
-// =====================================================================
-// =====================================================================
-//  BATCH 1 server patch — paste into BOTH Apps Script projects
-//  (খাদ্য তথ্য and বেলা হিসাব). Identical in both; nothing here depends on SOURCE_URL.
-//
-//  Functions marked REPLACES must have their old definition DELETED
-//  (a duplicate function name silently uses the last one in the file).
-//  Functions marked NEW are additions. See PATCH_NOTES.md for the
-//  few one-line edits inside existing functions (handle_, etc.).
-//  Requires an existing: sameRows_, newId_, r2_, num_, normTime_, tz_, ss_,
-//  tab_, layout_, readLog_, readDepositLog_, depCell_, setDepCell_, ...
-// =====================================================================
-
-// ---------- NEW: shared secret lives in Script Properties, never in source ----------
-// Set it by hand: Project Settings → Script properties → SYNC_SECRET (same value in BOTH projects, ≥ 24 chars).
-function syncSecret_() { return String(PropertiesService.getScriptProperties().getProperty('SYNC_SECRET') || ''); }
-// compares every character, so the time taken does not reveal how much of a guess was right
-function safeEq_(a, b) {
-  a = String(a || ''); b = String(b || '');
-  let d = a.length ^ b.length;
-  const n = Math.max(a.length, b.length);
-  for (let i = 0; i < n; i++) d |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
-  return d === 0;
-}
-// fails closed: no (or a too short) secret configured = the secret path is switched off
-function secretOk_(given) { const s = syncSecret_(); return s.length >= 24 && safeEq_(given, s); }
-
-// ---------- NEW: idempotency (a repeated request must not repeat the write) ----------
-const IDEM_TTL = 6 * 3600;           // seconds the "already done" marker is remembered (CacheService maximum)
-const MAX_AMOUNT = 10000000;         // upper sanity bound for one amount
-function idemId_(req, me) {
-  const id = String((req && req.requestId) || '');
-  return /^[A-Za-z0-9_-]{8,64}$/.test(id) ? 'rq|' + ((me && me.email) || '') + '|' + id : '';
-}
-function idemGet_(key) {
-  if (!key) return null;
-  try { const v = CacheService.getScriptCache().get(key); return v ? JSON.parse(v) : null; } catch (e) { return null; }
-}
-function idemPut_(key, info) {
-  if (!key) return;
-  try { CacheService.getScriptCache().put(key, JSON.stringify(info || {}), IDEM_TTL); } catch (e) { /* best effort; stableId_ below is the hard guarantee */ }
-}
-// Same requestId (+ position) always gives the same row id, so a retry after a half-finished save recognises its own rows.
-function stableId_(kind, rid, i) {
-  const rk = String(rid || '');
-  if (!/^[A-Za-z0-9_-]{8,64}$/.test(rk)) return newId_();
-  const b = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, kind + '|' + rk + '|' + i);
-  return b.map(function (x) { return ('0' + (x & 255).toString(16)).slice(-2); }).join('').slice(0, 10);
-}
-
-// ---------- NEW: one rule for amounts ----------
-function validAmount_(x, allowZero) {
-  if (x === '' || x === null || x === undefined) throw new Error('Enter a valid amount');
-  const n = Number(x);
-  if (!isFinite(n) || n < 0 || n > MAX_AMOUNT) throw new Error('Enter a valid amount');
-  const v = r2_(n);
-  if (v === 0 && !allowZero) throw new Error('Enter a valid amount');
-  return v;
-}
-
-// ---------- NEW: tabs that can grow, and a log write that cannot lose data half-way ----------
-function ensureRows_(s, n) {
-  const have = s.getMaxRows();
-  if (have < n) s.insertRowsAfter(have, n - have + 200);
-}
-// New rows are written FIRST; only the leftover old tail is cleared afterwards.
-// If setValues throws, the old content is still there. textCols (1-based) are stored as plain text,
-// so "=1+1", "5/10" or "007" typed by a person can never become a formula, a date or a number.
-function writeRows_(s, width, rows, textCols) {
-  const last = s.getLastRow();
-  if (sameRows_(s, last, width, rows)) return;
-  ensureRows_(s, rows.length + 1);
-  if (rows.length) {
-    (textCols || []).forEach(function (c) { s.getRange(2, c, rows.length, 1).setNumberFormat('@'); });
-    s.getRange(2, 1, rows.length, width).setValues(rows);
+// Stores this phone's token (or updates the owner if the same token comes again).
+function saveToken_(me, q) {
+  const token = String(q.token || '').trim();
+  if (token.length < 50 || token.length > 4096) throw new Error('Bad token');
+  const s = tokTab_(), last = s.getLastRow(), now = new Date().toISOString();
+  if (last > 1) {
+    const d = s.getRange(2, 1, last - 1, 3).getValues();
+    for (let i = 0; i < d.length; i++) {
+      if (String(d[i][1]) === token) { s.getRange(i + 2, 1, 1, 3).setValues([[me.email, token, now]]); return; }
+    }
   }
-  if (last - 1 > rows.length) s.getRange(rows.length + 2, 1, last - 1 - rows.length, width).clearContent();
+  s.appendRow([me.email, token, now]);
 }
 
-// ---------- REPLACES: writeLog_ / writeDepositLog_ / rewriteTab_ ----------
-function writeLog_(entries) {
-  const rows = entries.map(function (e) {
-    return [e.id, e.date, e.time || '', e.person, e.amount, e.details || '', e.email || '', e.name || ''];
+// Access token for the FCM API, signed with the service-account key kept in Script Properties.
+function fcmAccessToken_() {
+  const cache = CacheService.getScriptCache(), hit = cache.get('FCM_AT');
+  if (hit) return hit;
+  const P = PropertiesService.getScriptProperties();
+  const email = P.getProperty('FCM_CLIENT_EMAIL'), key = (P.getProperty('FCM_PRIVATE_KEY') || '').replace(/\\n/g, '\n');
+  if (!email || !key) return '';
+  const now = Math.floor(Date.now() / 1000);
+  const b64 = function (o) { return Utilities.base64EncodeWebSafe(typeof o === 'string' ? o : JSON.stringify(o)).replace(/=+$/, ''); };
+  const head = b64({ alg: 'RS256', typ: 'JWT' });
+  const claim = b64({ iss: email, scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 });
+  const sig = Utilities.base64EncodeWebSafe(Utilities.computeRsaSha256Signature(head + '.' + claim, key)).replace(/=+$/, '');
+  const r = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', { method: 'post', muteHttpExceptions: true,
+    payload: { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: head + '.' + claim + '.' + sig } });
+  const j = JSON.parse(r.getContentText());
+  if (!j.access_token) throw new Error('FCM sign-in failed: ' + r.getContentText().slice(0, 200));
+  cache.put('FCM_AT', j.access_token, 3000);
+  return j.access_token;
+}
+
+// Sends one notification to every saved device, except the devices of exceptEmail (the person who did the action).
+function push_(title, body, exceptEmail) {
+  const P = PropertiesService.getScriptProperties();
+  const project = P.getProperty('FCM_PROJECT_ID'), link = P.getProperty('APP_URL');
+  if (!project) return;
+  const s = tokTab_(), last = s.getLastRow();
+  if (last < 2) return;
+  const at = fcmAccessToken_();
+  if (!at) return;
+  const rows = s.getRange(2, 1, last - 1, 2).getValues();
+  const url = 'https://fcm.googleapis.com/v1/projects/' + project + '/messages:send';
+  const reqs = [], rowOf = [];
+  rows.forEach(function (r, i) {
+    if (!r[1]) return;
+    if (exceptEmail && String(r[0]).toLowerCase() === String(exceptEmail).toLowerCase()) return;
+    const message = { token: String(r[1]), notification: { title: title, body: body } };
+    if (link) message.webpush = { fcm_options: { link: link } };
+    reqs.push({ url: url, method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { Authorization: 'Bearer ' + at }, payload: JSON.stringify({ message: message }) });
+    rowOf.push(i + 2);
   });
-  writeRows_(glTab_(), GL_HEAD.length, rows, [1, 2, 3, 4, 6, 7, 8]);        // Amount (col 5) stays a number
-}
-function writeDepositLog_(entries) {
-  const rows = entries.map(function (e) {
-    return [e.id, e.date, e.time || '', e.person, e.amount, e.email || '', e.name || ''];
+  if (!reqs.length) return;
+  const dead = [];
+  UrlFetchApp.fetchAll(reqs).forEach(function (x, k) {
+    const code = x.getResponseCode();
+    if (code === 404 || (code === 400 && /UNREGISTERED/.test(x.getContentText()))) dead.push(rowOf[k]);
+    else if (code >= 300) Logger.log('push failed ' + code + ': ' + x.getContentText().slice(0, 200));
   });
-  writeRows_(dlTab_(), DL_HEAD.length, rows, [1, 2, 3, 4, 6, 7]);
-}
-function rewriteTab_(name, headers, rows) {
-  const all = headers.map(function (_, i) { return i + 1; });
-  writeRows_(tab_(name, headers, true), headers.length, rows, all);
-}
-
-// ---------- REPLACES: log_ — a full or failing Activity tab must never fail a save that already happened ----------
-function log_(me, type, forName, detail) {
-  try {
-    activity_().appendRow([new Date().toISOString(), me.name, type, forName || '', String(detail).slice(0, 500), false]);   // appendRow grows the tab
-  } catch (err) { Logger.log('log_ failed: ' + err.message); }
-}
-
-// ---------- REPLACES: cleanItem_ (same rules, one amount validator) ----------
-function cleanItem_(it, date, q) {
-  const person = String(it.bazarKorta || it.person || '').trim();
-  if (NAMES.indexOf(person) < 0) throw new Error('Choose the \u09AC\u09BE\u099C\u09BE\u09B0\u0995\u09B0\u09CD\u09A4\u09BE (who did the bazar) for every purchase');
-  const amount = validAmount_(it.amount, false);
-  const time = normTime_(it.time);
-  if (!time) throw new Error('Enter the time of every purchase');
-  checkNotFuture_(date, time, q);
-  return { person: person, amount: amount, time: time, details: String(it.details || '').trim().slice(0, 3000) };
-}
-
-// ---------- REPLACES: addSpending_ (retry-safe: returns only the purchases it really added) ----------
-function addSpending_(me, q) {
-  const date = String(q.date || '');
-  const items = Array.isArray(q.items) && q.items.length ? q.items : [{ bazarKorta: q.bazarKorta, time: q.time || nowParts_().time, amount: q.amount, details: q.details }];
-  const L = layout_();
-  if (!L.spend.rows.some(function (o) { return o.k === date; })) throw new Error('That date is not in the sheet');
-  const fresh = items.map(function (it) { return cleanItem_(it, date, q); });
-  const log = readLog_(), known = {};
-  log.forEach(function (e) { known[e.id] = 1; });
-  const added = [];
-  fresh.forEach(function (f, i) {
-    const id = stableId_('sp', q.requestId, i);
-    if (known[id]) return;                              // an earlier attempt already stored this purchase
-    added.push({ id: id, date: date, time: f.time, person: f.person, amount: f.amount, details: f.details, email: me.email, name: me.name });
-  });
-  if (log.filter(function (e) { return e.date === date; }).length + added.length > MAX_PER_DATE) throw new Error('Too many purchases on one date (max ' + MAX_PER_DATE + ')');
-  const all = log.concat(added);
-  if (added.length) writeLog_(all);
-  renderGrocery_(all, [date]);                          // always: completes a drawing an earlier attempt did not finish
-  return added;
-}
-
-// ---------- REPLACES: addDeposit_ (log row first, then the cell; returns false if this request was already applied) ----------
-function addDeposit_(me, q) {
-  const amt = validAmount_(q.amount, false);
-  const c = depCell_(q), np = nowParts_();
-  const dl = readDepositLog_(), id = stableId_('dp', q.requestId, 0);
-  if (dl.some(function (e) { return e.id === id; })) return false;
-  dl.push({ id: id, date: q.date, time: np.time, person: q.person, amount: amt, email: me.email, name: me.name });
-  writeDepositLog_(dl);
-  setDepCell_(c, num_(c.range.getValue()) + amt);
-  saveDepositMeta_(q.date, q.person, me);
-  return true;
-}
-
-// ---------- NEW: secret check used by handle_ (see PATCH_NOTES.md) ----------
-// ---------- NEW: read-only reconciliation — admin only, changes nothing ----------
-function auditReport_() {
-  const L = layout_(), issues = [], out = { ok: true, kind: L.kind, issues: issues };
-  out.month = L.meals.rows.length ? L.meals.rows[0].k.slice(0, 7) : '';
-  out.spreadsheetTimeZone = tz_();
-  out.scriptTimeZone = Session.getScriptTimeZone();
-  out.secretConfigured = syncSecret_().length >= 24;
-  const log = readLog_(), dl = readDepositLog_();
-
-  // 1) values sitting on continuation rows of the meal / deposit blocks (the app reads only the first row of each date; the sheet's =SUM total counts every row)
-  if (L.kind === 'blocks') {
-    const primary = {};
-    L.meals.rows.forEach(function (o) { primary[o.r] = 1; });
-    L.spend.rows.forEach(function (o) {
-      if (primary[o.r]) return;
-      [['meal', L.meals.cols], ['deposit', L.dep.cols]].forEach(function (blk) {
-        NAMES.forEach(function (n) {
-          const col = blk[1][n];
-          if (col !== undefined && num_(cellOf_(L, o.r, col)) !== 0) issues.push({ type: 'value-on-continuation-row', block: blk[0], row: o.r + 1, date: o.k, person: n, value: num_(cellOf_(L, o.r, col)) });
-        });
-      });
-    });
+  if (dead.length) {                                  // remove phones that uninstalled / revoked
+    const lock = LockService.getScriptLock();
+    if (lock.tryLock(5000)) {
+      try { dead.sort(function (a, b) { return b - a; }).forEach(function (r) { s.deleteRow(r); }); }
+      finally { lock.releaseLock(); }
+    }
   }
-  // 2) grocery: log vs cells, per date
-  const cellSp = {}, logSp = {};
-  L.spend.rows.forEach(function (o) {
-    let a = 0;
-    if (L.kind === 'blocks') NAMES.forEach(function (n) { const c = L.spend.cols[n]; if (c !== undefined) a += num_(cellOf_(L, o.r, c)); });
-    else a = num_(cellOf_(L, o.r, L.spend.amountCol));
-    cellSp[o.k] = r2_((cellSp[o.k] || 0) + a);
-  });
-  log.forEach(function (e) {
-    if (L.kind === 'blocks' && NAMES.indexOf(e.person) < 0) return;
-    if (cellSp[e.date] !== undefined) logSp[e.date] = r2_((logSp[e.date] || 0) + e.amount);
-  });
-  Object.keys(cellSp).forEach(function (d) {
-    if (Math.abs(cellSp[d] - (logSp[d] || 0)) >= 0.01) issues.push({ type: 'grocery-mismatch', date: d, cells: cellSp[d], log: logSp[d] || 0 });
-  });
-  // 3) deposits: cell vs per-entry log
-  const dsum = {};
-  dl.forEach(function (e) { dsum[e.date + '|' + e.person] = r2_((dsum[e.date + '|' + e.person] || 0) + e.amount); });
-  L.dep.rows.forEach(function (o) {
-    NAMES.forEach(function (n) {
-      const c = L.dep.cols[n]; if (c === undefined) return;
-      const diff = r2_(num_(cellOf_(L, o.r, c)) - (dsum[o.k + '|' + n] || 0));
-      if (diff > 0.009) issues.push({ type: 'deposit-not-in-log', date: o.k, person: n, amount: diff, note: 'typed in the sheet, shown as a "sheet entry" (usually legacy)' });
-      if (diff < -0.009) issues.push({ type: 'deposit-log-exceeds-cell', date: o.k, person: n, amount: diff });
-    });
-  });
-  // 4) duplicate ids, formula-like text
-  [['GroceryLog', log], ['DepositLog', dl]].forEach(function (p) {
-    const seen = {}; let dup = 0;
-    p[1].forEach(function (e) { if (seen[e.id]) dup++; seen[e.id] = 1; });
-    if (dup) issues.push({ type: 'duplicate-ids', tab: p[0], count: dup });
-  });
-  const risky = log.filter(function (e) { return /^[=+\-@]/.test(String(e.details || '')); }).length;
-  if (risky) issues.push({ type: 'formula-like-text', tab: 'GroceryLog', count: risky });
-  // 5) tab capacity
-  out.capacity = {};
-  ['GroceryLog', 'DepositLog', 'DepositMeta', 'MealDetails', 'Activity'].forEach(function (n) {
-    const s = ss_().getSheetByName(n);
-    if (s) { out.capacity[n] = { used: s.getLastRow(), max: s.getMaxRows() }; if (s.getLastRow() > s.getMaxRows() * 0.8) issues.push({ type: 'tab-nearly-full', tab: n }); }
-  });
-  out.issueCount = issues.length;
-  return out;
 }
-function reconcileReport() { Logger.log(JSON.stringify(auditReport_(), null, 1)); }   // run from the editor: read-only
-function checkSecretConfigured() { Logger.log('SYNC_SECRET configured (>= 24 chars): ' + (syncSecret_().length >= 24)); }
+
+// Run once from the editor to test: sends a message to every saved phone.
+function testPush() { push_('খাদ্য তথ্য', 'Test notification', ''); }
