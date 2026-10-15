@@ -1242,15 +1242,20 @@ async function syncPushToken() {
 
 async function updatePushBtn() {
   const ok = await pushReady();
-  pushBtn.hidden = !ok || Notification.permission === "granted" || Notification.permission === "denied";
+  pushBtn.hidden = !ok || Notification.permission === "denied";
+  pushBtn.textContent = Notification.permission === "granted" ? "🔔 Notifications: test" : "🔔 Notifications";
 }
 
 pushBtn.onclick = async () => {
-  const perm = await Notification.requestPermission();      // must come from a tap
-  if (perm !== "granted") return updatePushBtn();
+  if (Notification.permission !== "granted") {
+    const perm = await Notification.requestPermission();   // must come from a tap
+    if (perm !== "granted") return updatePushBtn();
+  }
+  try { localStorage.removeItem("pushToken"); } catch (e) {}
   const ok = await track("Turning on notifications…", syncPushToken);
   updatePushBtn();
-  if (!ok) alert("Could not turn on notifications.\n\n" + (pushErr || "Unknown reason") + "\n\nPlease try again.");
+  alert(ok ? "Notifications are on for this phone ✓"
+           : "Could not turn on notifications.\n\n" + (pushErr || "Unknown reason"));
 };
 
 // A message that arrives while the app is open and visible: show it as a normal notification.
