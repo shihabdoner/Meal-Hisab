@@ -126,6 +126,7 @@ fillNameSelect("fundWho", "— নাম নির্বাচন করুন �
 fillNameSelect("mealWho", "— নাম নির্বাচন করুন —");
 
 // ---------- Spending / Meal / Fund: slide-open sections (members AND admin) ----------
+// Opening one section closes the other two. All start closed.
 document.querySelectorAll(".sec").forEach(sec => {
   const title = sec.querySelector(".secTitle");
   const body = document.createElement("div"); body.className = "secBody";
@@ -133,7 +134,13 @@ document.querySelectorAll(".sec").forEach(sec => {
   [...sec.children].filter(c => c !== title).forEach(c => inner.appendChild(c));
   body.appendChild(inner); sec.appendChild(body);
   const toggle = () => {
-    title.setAttribute("aria-expanded", sec.classList.toggle("open"));
+    const open = sec.classList.toggle("open");
+    title.setAttribute("aria-expanded", open);
+    if (open) document.querySelectorAll(".sec").forEach(o => {
+      if (o === sec) return;
+      o.classList.remove("open");
+      o.querySelector(".secTitle").setAttribute("aria-expanded", "false");
+    });
   };
   title.addEventListener("click", toggle);
   title.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
@@ -424,6 +431,15 @@ SHEET_PANELS.forEach(id => $(id).addEventListener("toggle", () => {
   if ($(id).open && me && books[tblIdx()] !== srcBook && Date.now() - tblStamp > 5000) loadTables();
 }));
 
+// <details> cards that behave as one group: opening one closes the others
+function exclusiveDetails(list) {
+  list.forEach(d => d.addEventListener("toggle", () => {
+    if (d.open) list.forEach(o => { if (o !== d) o.open = false; });
+  }));
+}
+exclusiveDetails(SHEET_PANELS.map($));                                              // Sheet view tables
+exclusiveDetails([...document.querySelectorAll("#pickGrocery details.card")]);      // Add grocery / Grocery history
+
 // ---------- Who is the interface for (admin preview) ----------
 function effectiveMember() {
   const m = (S.members || []).find(x => x.name === previewName);
@@ -528,8 +544,9 @@ const dateChip = d => { const b = document.createElement("b"); b.className = "sp
 const timeChip = t => { const b = document.createElement("b"); b.className = "timeChip"; b.textContent = "🕒 " + t; return b; };
 const dayChip = d => { const b = document.createElement("b"); b.className = "day-chip"; b.textContent = new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" }); return b; };
 const openDates = new Set();                                 // opened date toggles survive the refresh
+// Date toggles inside a list are mutually exclusive: opening one closes its siblings.
 function dateToggleEl(key, d, sum, body) {
-  const box = document.createElement("div"); box.className = "dtItem";
+  const box = document.createElement("div"); box.className = "dtItem"; box.dataset.key = key;
   const head = document.createElement("button"); head.type = "button"; head.className = "dtHead";
   const s = document.createElement("span"); s.className = "dtSum"; s.textContent = sum || "";
   const chev = document.createElement("span"); chev.className = "chev"; chev.textContent = "▾";
@@ -538,7 +555,16 @@ function dateToggleEl(key, d, sum, body) {
   const inner = document.createElement("div"); inner.className = "histInner"; inner.appendChild(body); wrap.appendChild(inner);
   const set = o => { wrap.classList.toggle("open", o); head.setAttribute("aria-expanded", String(o)); };
   set(openDates.has(key));
-  head.onclick = () => { const o = !wrap.classList.contains("open"); o ? openDates.add(key) : openDates.delete(key); set(o); };
+  head.onclick = () => {
+    const o = !wrap.classList.contains("open");
+    if (o && box.parentElement) [...box.parentElement.children].forEach(sib => {
+      if (sib === box || !sib.classList.contains("dtItem")) return;
+      openDates.delete(sib.dataset.key);
+      sib.querySelector(":scope > .histBody").classList.remove("open");
+      sib.querySelector(":scope > .dtHead").setAttribute("aria-expanded", "false");
+    });
+    o ? openDates.add(key) : openDates.delete(key); set(o);
+  };
   box.append(head, wrap);
   return box;
 }
@@ -1143,17 +1169,21 @@ function renderAlerts() {
   });
 }
 
-// ---------- Toggle slide boxes (the four big headers are mutually exclusive) + pixel printer icons ----------
+// ---------- Toggle slide boxes + pixel printer icons ----------
+// Exclusive groups: opening one closes the others in the same group. All start closed.
+//  - the four big headers (.slideToggle)
+//  - KHALAR Taka / Gass BILL (.utilToggle)
+const EXCLUSIVE = [".slideToggle[data-slide]", ".utilToggle[data-slide]"];
 document.querySelectorAll("[data-slide]").forEach(btn => btn.onclick = () => {
   const open = $(btn.dataset.slide).classList.toggle("open");
   btn.setAttribute("aria-expanded", String(open));
-  if (open && btn.classList.contains("slideToggle")) {
-    document.querySelectorAll(".slideToggle[data-slide]").forEach(o => {
-      if (o === btn) return;
-      $(o.dataset.slide).classList.remove("open");
-      o.setAttribute("aria-expanded", "false");
-    });
-  }
+  if (!open) return;
+  const sel = EXCLUSIVE.find(s => btn.matches(s));
+  if (sel) document.querySelectorAll(sel).forEach(o => {
+    if (o === btn) return;
+    $(o.dataset.slide).classList.remove("open");
+    o.setAttribute("aria-expanded", "false");
+  });
 });
 const PRINTER = ["..####..", "..#..#..", "########", "#......#", "########", ".#....#.", ".######."];
 document.querySelectorAll(".printMini button").forEach(b => {
