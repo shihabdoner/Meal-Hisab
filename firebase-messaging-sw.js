@@ -2,14 +2,13 @@ importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js
 importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js");
 
 firebase.initializeApp({
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-});
-
+  apiKey: "AIzaSyAfp6ACmE3d-9iAieAp1knA40qKEbdcx7Y",
+  authDomain: "khaddo-tothyo.firebaseapp.com",
+  projectId: "khaddo-tothyo",
+  storageBucket: "khaddo-tothyo.firebasestorage.app",
+  messagingSenderId: "221896509109",
+  appId: "1:221896509109:web:a36edd0b6f0ab4a8c020fc"
+};
 const messaging = firebase.messaging();
 
 // Data-only messages (no "notification" block) are shown here.
