@@ -2,6 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import {
   getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 import * as CFG from "./firebase-config.js";
 const firebaseConfig = CFG.firebaseConfig;
 
@@ -157,7 +158,8 @@ if (!books.length) { $("boot").hidden = true; $("setup").hidden = false; throw n
 const srcBook = books.find(b => b.id === "khaddo") || books[0];
 const otherBooks = books.filter(b => b !== srcBook);
 
-const auth = getAuth(initializeApp(firebaseConfig));
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
 let me = null;            // the real signed-in user (from the sheet's Members tab)
 let U = null;             // the user whose interface is shown (= me, or a member while the admin previews)
 let S = null;             // data of the source sheet (everything except the Sheet view tables)
@@ -383,6 +385,7 @@ async function refreshNow(force) {
     perfLog("essential data (token + load)", performance.now() - t0);
     S = data; me = S.me; setLive(true); setRoleHint(me.admin ? "admin" : "member");
     if (auth.currentUser) saveCache(auth.currentUser.uid, data);
+    updatePushBtn(); syncPushToken();                    // notifications: show/hide the button, refresh this device's token
     $("boot").hidden = true; $("login").hidden = true; $("app").hidden = false;
     const wasLoading = $("app").classList.contains("loading");
     const sig = JSON.stringify({ ...data, timing: 0 }), changed = force || wasLoading || sig !== lastSig;
@@ -1162,6 +1165,59 @@ document.querySelectorAll(".printMini button").forEach(b => {
     r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", 1); r.setAttribute("height", 1); s.appendChild(r);
   }));
   b.prepend(s);
+});
+
+// ---------- Push notifications (Firebase Cloud Messaging) ----------
+const pushBtn = $("pushBtn");
+let messaging = null, pushSwReg = null;
+
+async function pushReady() {
+  if (messaging) return true;
+  try {
+    if (!(await isSupported()) || !CFG.VAPID_KEY) return false;
+    messaging = getMessaging(fbApp);
+    return true;
+  } catch (e) { return false; }
+}
+
+// Gets this device's token and stores it in the sheet. Safe to call repeatedly (tokens can change).
+async function syncPushToken() {
+  if (!(await pushReady()) || Notification.permission !== "granted" || !auth.currentUser) return false;
+  try {
+    pushSwReg = pushSwReg || await navigator.serviceWorker.register("firebase-messaging-sw.js",
+      { scope: "./firebase-cloud-messaging-push-scope" });
+    const token = await getToken(messaging, { vapidKey: CFG.VAPID_KEY, serviceWorkerRegistration: pushSwReg });
+    if (!token) return false;
+    if (localStorage.getItem("pushToken") === token + "|" + auth.currentUser.uid) return true;   // already saved
+    const idToken = await auth.currentUser.getIdToken();
+    await callWrite(srcBook.url, "saveToken", { token, requestId: newRid() }, idToken);          // works in preview too
+    localStorage.setItem("pushToken", token + "|" + auth.currentUser.uid);
+    return true;
+  } catch (e) { console.error("push", e); return false; }
+}
+
+async function updatePushBtn() {
+  const ok = await pushReady();
+  pushBtn.hidden = !ok || Notification.permission === "granted" || Notification.permission === "denied";
+}
+
+pushBtn.onclick = async () => {
+  const perm = await Notification.requestPermission();      // must come from a tap
+  if (perm !== "granted") return updatePushBtn();
+  const ok = await track("Turning on notifications…", syncPushToken);
+  updatePushBtn();
+  if (!ok) alert("Could not turn on notifications. Please try again.");
+};
+
+// A message that arrives while the app is open and visible: show it as a normal notification.
+pushReady().then(ok => {
+  if (!ok) return;
+  onMessage(messaging, p => {
+    const n = p.notification || p.data || {};
+    navigator.serviceWorker.getRegistration("./firebase-cloud-messaging-push-scope").then(reg => {
+      if (reg) reg.showNotification(n.title || "খাদ্য তথ্য", { body: n.body || "", icon: "icon-192.png", tag: "khaddo-fg" });
+    });
+  });
 });
 
 // ---------- Service worker: fast start and offline shell ----------
