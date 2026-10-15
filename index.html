@@ -70,8 +70,8 @@
     href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&display=swap"
   >
 </noscript>
-<link rel="stylesheet" href="style.css?v=20261014a">
-<link rel="modulepreload" href="app.js?v=20261014a">
+<link rel="stylesheet" href="style.css?v=20261015a">
+<link rel="modulepreload" href="app.js?v=20261015a">
 <link rel="modulepreload" href="firebase-config.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
@@ -176,7 +176,7 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#FF7417","#080808",
     <div class="topbar">
       <div class="topIdentity"><span id="me"></span><div class="month" id="monthLabel"></div></div>
       <select id="adminPreview" class="adminPreview" aria-label="Preview a member's interface" hidden></select>
-      <span class="topBtns"><button id="refresh" title="Reload from sheet" aria-label="Reload from sheet">⟳</button> <button id="out">Sign out</button></span>
+      <span class="topBtns"><button id="pushBtn" type="button" hidden>🔔 Notifications</button> <button id="refresh" title="Reload from sheet" aria-label="Reload from sheet">⟳</button> <button id="out">Sign out</button></span>
     </div>
     <div id="previewNotice" class="notice" hidden>Preview mode: this is the selected member’s interface. Editing is switched off while previewing.</div>
 
@@ -298,16 +298,16 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#FF7417","#080808",
             <div class="card detailSection" id="fundSection">
               <label for="fundWho">Select person</label>
               <select id="fundWho"></select>
-             <div id="fundPerson" hidden>
-  <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
-  <form id="depForm" class="form" hidden>
-    <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" aria-label="Deposit amount" required>
-    <input id="depDate" type="date" aria-label="Deposit date" required>
-    <button>+ Add deposit</button>
-  </form>
-  <button type="button" class="histToggle depsToggle" data-slide="depsBody" aria-expanded="false" aria-controls="depsBody"><span>জমাদানের তথ্য</span><span class="chev">▾</span></button>
-  <div class="histBody" id="depsBody"><div class="histInner"><div id="deps" class="muted"></div></div></div>
-</div>
+              <div id="fundPerson" hidden>
+                <div class="row"><span>মোট জমাকৃত টাকার পরিমাণ :</span><b id="pt">৳0</b></div>
+                <form id="depForm" class="form" hidden>
+                  <input id="depAmt" type="number" min="0" step="any" placeholder="Amount" aria-label="Deposit amount" required>
+                  <input id="depDate" type="date" aria-label="Deposit date" required>
+                  <button>+ Add deposit</button>
+                </form>
+                <button type="button" class="histToggle depsToggle" data-slide="depsBody" aria-expanded="false" aria-controls="depsBody"><span>জমাদানের তথ্য</span><span class="chev">▾</span></button>
+                <div class="histBody" id="depsBody"><div class="histInner"><div id="deps" class="muted"></div></div></div>
+              </div>
             </div>
           </section>
 
@@ -336,10 +336,11 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#FF7417","#080808",
         <section class="card" id="adminPanel">
 
           <button type="button" class="histToggle memberToggle" data-slide="memberBody" aria-expanded="false" aria-controls="memberBody"><span>Add/Edit member</span><span class="chev">▾</span></button>
-<div class="histBody" id="memberBody"><div class="histInner"><div class="memberPad">
-  <div class="muted" style="margin-bottom:8px">Add each person's Google email. “Make admin” hands over admin to that person and you become a regular member.</div>
-  <div id="memberList"></div>
-</div></div></div>
+          <div class="histBody" id="memberBody"><div class="histInner"><div class="memberPad">
+            <div class="muted" style="margin-bottom:8px">Add each person's Google email. “Make admin” hands over admin to that person and you become a regular member.</div>
+            <div id="memberList"></div>
+          </div></div></div>
+
           <div class="permissionBox">
             <h3>Member permissions</h3>
             <label for="permPerson">Persons</label>
@@ -398,7 +399,7 @@ document.getElementById("spSheets").innerHTML=word("Sheets","#FF7417","#080808",
   });
 })();
 </script>
-<script type="module" src="app.js?v=20261014a"
+<script type="module" src="app.js?v=20261015a"
   onerror="document.getElementById('boot').hidden=true;document.getElementById('bootError').hidden=false"></script>
 </body>
 </html>
