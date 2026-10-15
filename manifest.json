@@ -1,15 +1,19 @@
 {
   "name": "খাদ্য তথ্য",
   "short_name": "খাদ্য",
+  "description": "Daily meals, grocery spending and fund tracking for the mess.",
   "lang": "bn",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "orientation": "portrait",
+  "categories": ["food", "finance"],
+  "background_color": "#121018",
+  "theme_color": "#121018",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icon-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
