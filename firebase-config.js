@@ -14,3 +14,4 @@ export const BOOKS = [
   { id: "khaddo", label: "খাদ্য তথ্য",   url: "https://script.google.com/macros/s/AKfycbzdu_Qf870Li2A074qQaoQF8i3sjEl-cnyI7tFBpunbD6GYvQ_tK6H7A04Ts7vg2byipg/exec" },
   { id: "bazar",  label: "বেলা হিসাব", url: "https://script.google.com/macros/s/AKfycbwhvsDjTfC2aqaPq00UocgCfszdpxJBGY6XpJVy0_FfpxDNqskqpM28xWi2UVClke1D2A/exec" }
 ];
+export const VAPID_KEY = "BE1R54O5RwshUMeCeEqkZ7kvkWgAe3mAR1LtPiI-uTCbVLMyW6K27L29qq160-p7CeW7o9YqeXZJMGoz0jhfeiQ";
