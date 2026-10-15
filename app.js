@@ -1200,30 +1200,44 @@ document.querySelectorAll(".printMini button").forEach(b => {
 // ---------- Push notifications (Firebase Cloud Messaging) ----------
 const pushBtn = $("pushBtn");
 let messaging = null, pushSwReg = null;
+let pushErr = "";                                        // last reason why turning notifications on failed (shown in the popup)
 
 async function pushReady() {
   if (messaging) return true;
   try {
-    if (!(await isSupported()) || !CFG.VAPID_KEY) return false;
+    if (!(await isSupported())) { pushErr = "This browser does not support push messaging"; return false; }
+    if (!CFG.VAPID_KEY) { pushErr = "VAPID_KEY is missing in firebase-config.js"; return false; }
     messaging = getMessaging(fbApp);
     return true;
-  } catch (e) { return false; }
+  } catch (e) { pushErr = "messaging init: " + (e.code || e.message); return false; }
 }
 
 // Gets this device's token and stores it in the sheet. Safe to call repeatedly (tokens can change).
 async function syncPushToken() {
-  if (!(await pushReady()) || Notification.permission !== "granted" || !auth.currentUser) return false;
+  let step = "start";
   try {
+    pushErr = "";
+    step = "support check";
+    if (!(await pushReady())) return false;
+    if (Notification.permission !== "granted") { pushErr = "Notification permission is: " + Notification.permission; return false; }
+    if (!auth.currentUser) { pushErr = "Not signed in"; return false; }
+    step = "service worker (firebase-messaging-sw.js)";
     pushSwReg = pushSwReg || await navigator.serviceWorker.register("firebase-messaging-sw.js",
       { scope: "./firebase-cloud-messaging-push-scope" });
+    step = "getting the device token";
     const token = await getToken(messaging, { vapidKey: CFG.VAPID_KEY, serviceWorkerRegistration: pushSwReg });
-    if (!token) return false;
+    if (!token) { pushErr = "No token was returned"; return false; }
     if (localStorage.getItem("pushToken") === token + "|" + auth.currentUser.uid) return true;   // already saved
+    step = "saving the token in the sheet";
     const idToken = await auth.currentUser.getIdToken();
     await callWrite(srcBook.url, "saveToken", { token, requestId: newRid() }, idToken);          // works in preview too
     localStorage.setItem("pushToken", token + "|" + auth.currentUser.uid);
     return true;
-  } catch (e) { console.error("push", e); return false; }
+  } catch (e) {
+    console.error("push", step, e);
+    pushErr = step + ": " + (e.code || e.name || "") + " " + (e.message || "");
+    return false;
+  }
 }
 
 async function updatePushBtn() {
@@ -1236,7 +1250,7 @@ pushBtn.onclick = async () => {
   if (perm !== "granted") return updatePushBtn();
   const ok = await track("Turning on notifications…", syncPushToken);
   updatePushBtn();
-  if (!ok) alert("Could not turn on notifications. Please try again.");
+  if (!ok) alert("Could not turn on notifications.\n\n" + (pushErr || "Unknown reason") + "\n\nPlease try again.");
 };
 
 // A message that arrives while the app is open and visible: show it as a normal notification.
