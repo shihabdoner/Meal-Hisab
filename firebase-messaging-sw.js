@@ -8,7 +8,7 @@ firebase.initializeApp({
   storageBucket: "khaddo-tothyo.firebasestorage.app",
   messagingSenderId: "221896509109",
   appId: "1:221896509109:web:a36edd0b6f0ab4a8c020fc"
-};
+});
 const messaging = firebase.messaging();
 
 // Data-only messages (no "notification" block) are shown here.
