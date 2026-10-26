@@ -12,6 +12,6 @@ export const firebaseConfig = {
 // The site shows a "Sheet" switcher when more than one URL is filled in.
 export const BOOKS = [
   { id: "khaddo", label: "খাদ্য তথ্য",   url: "https://script.google.com/macros/s/AKfycbxDg3ImK4961W299lBCddDiJVTRHRx9bY0xRd719iirS06zCQU1fi8Npu-QOY16piqCkA/exec" },
-  { id: "bazar",  label: "বেলা হিসাব", url: "https://script.google.com/macros/s/AKfycbw4hxEDYc6wv3roRW7flpOKAwQbtDhtYqnhywTKaDxC7NBPhQUC8dyo4mOv41X8kI089w/exec" }
+  { id: "bazar",  label: "বেলা হিসাব", url: "https://script.google.com/macros/s/AKfycbxV2uAmvb0OOP8tXHSmXzGbc_3ccHAKYACvDqj-mv3oJpdiXiQRcYKjq2__54oIxOUFkA/exec" }
 ];
 export const VAPID_KEY = "BE1R54O5RwshUMeCeEqkZ7kvkWgAe3mAR1LtPiI-uTCbVLMyW6K27L29qq160-p7CeW7o9YqeXZJMGoz0jhfeiQ";
