@@ -193,7 +193,24 @@ $("bookSel").addEventListener("change", () => {
 // ---------- API (Google Apps Script web app on top of each sheet) ----------
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const isPreview = () => !!(me && me.admin && previewName);
-const loadSheet = async b => call(b.url, "load", {}, await auth.currentUser.getIdToken());
+// KHADDO-SQL-PATCH v1: SQL is the source of truth (reads AND writes). The Apps Script web apps are only a read-only fallback.
+const SQL_URL = CFG.SQL_API_URL || "";
+if (!SQL_URL) console.warn("SQL_API_URL is empty in firebase-config.js: saving is switched off");
+let preloaded = null, preloadedAt = 0;      // every save answers with the fresh data, so no second request is needed
+async function loadFast(b, idToken) {
+  if (preloaded && b === srcBook && Date.now() - preloadedAt < 10000) { const d = preloaded; preloaded = null; return d; }
+  preloaded = null;
+  if (SQL_URL) {
+    try { return await call(SQL_URL, "load", { book: b.id }, idToken); }
+    catch (e) {
+      if (/group list/i.test(e.message)) throw e;                         // a real "not a member" answer
+      console.warn("[sql] load failed, reading the drawn sheet (read-only):", e.message);
+    }
+  }
+  return call(b.url, "load", {}, idToken);
+}
+async function syncMirrors() { return []; }                              // the sheets redraw themselves from SQL now
+const loadSheet = async b => loadFast(b, await auth.currentUser.getIdToken());
 async function call(url, action, payload, idToken) {
   const t0 = performance.now();
   const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 30000);
@@ -213,7 +230,7 @@ async function call(url, action, payload, idToken) {
   return j;
 }
 let syncRun = null, syncAgain = false;
-async function syncMirrors(idToken) {
+async function syncMirrorsOld_(idToken) {
   if (syncRun) { syncAgain = true; return syncRun; }        // one sync at a time; later requests become one repeat
   syncRun = (async () => {
     let fails = [];
@@ -253,11 +270,11 @@ async function api(action, payload = {}) {
   const idToken = await auth.currentUser.getIdToken();
   let j;
   // the phone's date + time go along, so the sheet can refuse entries for a day / time that has not come yet
-  if (action === "load") j = await call(srcBook.url, action, payload, idToken);      // always the source sheet
-  else j = await callWrite(srcBook.url, action, { ...payload, requestId: payload.requestId || newRid(), today: nowDate(), now: nowTime() }, idToken);
-  if (action !== "load" && otherBooks.length) {
-    const fails = await syncMirrors(idToken);
-    if (fails.length) throw new Error("Saved in " + srcBook.label + ", but the other sheet is not fully updated (" + fails.join("; ") + "). Press ⟳ to sync again.");
+  if (action === "load") j = await loadFast(srcBook, idToken);                       // SQL (falls back to the drawn sheet, read-only)
+    else {
+    if (!SQL_URL) throw new Error("SQL_API_URL is not set in firebase-config.js");
+    j = await callWrite(SQL_URL, action, { ...payload, requestId: payload.requestId || newRid(), today: nowDate(), now: nowTime() }, idToken);
+    if (j.data) { preloaded = j.data; preloadedAt = Date.now(); }                    // the save answers with the fresh data
   }
   return j;
 }
@@ -1230,7 +1247,7 @@ async function syncPushToken() {
     if (localStorage.getItem("pushToken") === token + "|" + auth.currentUser.uid) return true;   // already saved
     step = "saving the token in the sheet";
     const idToken = await auth.currentUser.getIdToken();
-    await callWrite(srcBook.url, "saveToken", { token, requestId: newRid() }, idToken);          // works in preview too
+    await callWrite(SQL_URL, "saveToken", { token, requestId: newRid() }, idToken);          // works in preview too
     localStorage.setItem("pushToken", token + "|" + auth.currentUser.uid);
     return true;
   } catch (e) {
