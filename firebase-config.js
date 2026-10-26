@@ -11,7 +11,10 @@ export const firebaseConfig = {
 // Every spreadsheet has its own Apps Script "Web app" URL (ends with /exec).
 // The site shows a "Sheet" switcher when more than one URL is filled in.
 export const BOOKS = [
-  { id: "khaddo", label: "খাদ্য তথ্য",   url: "https://script.google.com/macros/s/AKfycbxDg3ImK4961W299lBCddDiJVTRHRx9bY0xRd719iirS06zCQU1fi8Npu-QOY16piqCkA/exec" },
-  { id: "bazar",  label: "বেলা হিসাব", url: "https://script.google.com/macros/s/AKfycbxV2uAmvb0OOP8tXHSmXzGbc_3ccHAKYACvDqj-mv3oJpdiXiQRcYKjq2__54oIxOUFkA/exec" }
+  { id: "khaddo", label: "খাদ্য তথ্য",   url: "https://script.google.com/macros/s/AKfycbxAbFxYNA789CF0J2FFdgghsaCkIpd_VCUhm-SSPC-019YH2JkuOhQXYZ4Sg5OTP3NoCg/exec" },
+  { id: "bazar",  label: "বেলা হিসাব", url: "https://script.google.com/macros/s/AKfycbxAbFxYNA789CF0J2FFdgghsaCkIpd_VCUhm-SSPC-019YH2JkuOhQXYZ4Sg5OTP3NoCg/exec" }
 ];
 export const VAPID_KEY = "BE1R54O5RwshUMeCeEqkZ7kvkWgAe3mAR1LtPiI-uTCbVLMyW6K27L29qq160-p7CeW7o9YqeXZJMGoz0jhfeiQ";
+
+// SQL API (Supabase Edge Function). Empty = the app cannot save.
+export const SQL_API_URL = "https://szzccmkdouvmzluabuyi.supabase.co/functions/v1/api";
